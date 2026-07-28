@@ -17,6 +17,10 @@ public sealed class QuoteManagerDbContext(DbContextOptions<QuoteManagerDbContext
 
     public DbSet<AppUser> Users => Set<AppUser>();
 
+    public DbSet<RequestInvitation> RequestInvitations => Set<RequestInvitation>();
+
+    public DbSet<QuoteStatusLookup> QuoteStatuses => Set<QuoteStatusLookup>();
+
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();

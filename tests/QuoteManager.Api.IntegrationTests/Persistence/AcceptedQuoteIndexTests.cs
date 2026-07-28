@@ -20,6 +20,7 @@ public sealed class AcceptedQuoteIndexTests : IAsyncLifetime
     private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"qm-index-{Guid.NewGuid():N}.db");
     private QuoteManagerDbContext _context = null!;
     private Guid _requestId;
+    private Guid _vendorOrganizationId;
 
     public async ValueTask InitializeAsync()
     {
@@ -34,13 +35,22 @@ public sealed class AcceptedQuoteIndexTests : IAsyncLifetime
         await _context.Database.MigrateAsync();
 
         _requestId = Guid.CreateVersion7();
+        _vendorOrganizationId = Guid.CreateVersion7();
         var organizationId = Guid.CreateVersion7();
 
+        // Both organisations have to exist: quotes now carry a real foreign key to the vendor,
+        // so a fabricated id is rejected by the database rather than quietly stored.
         await _context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO "Organizations" ("Id", "Name", "Kind", "CreatedAt", "Version")
             VALUES ({0}, 'Acme', 'Client', '2026-07-28T12:00:00+00:00', 1);
             """.Replace("{0}", Quoted(organizationId)));
+
+        await _context.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO "Organizations" ("Id", "Name", "Kind", "CreatedAt", "Version")
+            VALUES ({0}, 'Bolt Mechanical', 'Vendor', '2026-07-28T12:00:00+00:00', 1);
+            """.Replace("{0}", Quoted(_vendorOrganizationId)));
 
         await _context.Database.ExecuteSqlRawAsync(
             """
@@ -124,7 +134,7 @@ public sealed class AcceptedQuoteIndexTests : IAsyncLifetime
             INSERT INTO "Quotes" ("Id", "RequestId", "VendorOrganizationId", "Status", "ExpiresAt",
                                   "Notes", "CreatedAt", "StatusChangedAt", "StatusReason",
                                   "AmountMinorUnits", "CurrencyCode", "Version")
-            VALUES ({Quoted(Guid.CreateVersion7())}, {Quoted(_requestId)}, {Quoted(Guid.CreateVersion7())},
+            VALUES ({Quoted(Guid.CreateVersion7())}, {Quoted(_requestId)}, {Quoted(_vendorOrganizationId)},
                     '{status}', NULL, NULL, '2026-07-28T12:00:00+00:00', '2026-07-28T12:00:00+00:00', NULL,
                     {amountMinorUnits}, 'USD', 1);
             """;

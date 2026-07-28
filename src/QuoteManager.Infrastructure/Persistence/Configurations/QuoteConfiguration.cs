@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using QuoteManager.Domain.Organizations;
 using QuoteManager.Domain.Quotes;
+using QuoteManager.Infrastructure.Persistence.Entities;
 
 namespace QuoteManager.Infrastructure.Persistence.Configurations;
 
@@ -50,6 +52,23 @@ public sealed class QuoteConfiguration : IEntityTypeConfiguration<Quote>
 
         builder.HasIndex(q => q.RequestId);
         builder.HasIndex(q => q.VendorOrganizationId);
+
+        // Referential integrity for the two identifiers this table carries. Both were previously
+        // indexed but unconstrained, which let the database accept a quote from a vendor that does
+        // not exist — an index makes a lookup fast, it does not make a value valid.
+        builder.HasOne<Organization>()
+            .WithMany()
+            .HasForeignKey(q => q.VendorOrganizationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<QuoteStatusLookup>()
+            .WithMany()
+            .HasForeignKey(q => q.Status)
+            .HasPrincipalKey(s => s.Status)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // The dashboard's two hottest reads: what is awaiting review, and what lapses soon.
+        builder.HasIndex(q => new { q.Status, q.ExpiresAt });
 
         // AD-3, second line of defence. The aggregate refuses a second acceptance in memory; this
         // stops two concurrent transactions that each passed that check from both committing.

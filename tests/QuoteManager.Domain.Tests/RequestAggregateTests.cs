@@ -206,6 +206,47 @@ public sealed class RequestAggregateTests
     }
 
     [Fact]
+    public void Invited_vendors_who_have_not_quoted_are_the_signal_the_dashboard_needs()
+    {
+        var request = NewRequest();
+        var responded = Guid.CreateVersion7();
+        var silent = Guid.CreateVersion7();
+
+        request.InviteVendor(responded, Admin, Now);
+        request.InviteVendor(silent, Admin, Now);
+        request.AddQuote(responded, new Money(1000m, "USD"), null, null, Vendor, Now);
+
+        // A request with one quote looks identical whether one vendor was asked or five were;
+        // this is what distinguishes those cases.
+        request.Invitations.Count.ShouldBe(2);
+        request.AwaitingResponseFrom.ShouldBe([silent]);
+    }
+
+    [Fact]
+    public void Inviting_the_same_vendor_twice_is_a_harmless_no_op()
+    {
+        var request = NewRequest();
+        var vendorId = Guid.CreateVersion7();
+
+        request.InviteVendor(vendorId, Admin, Now);
+        request.InviteVendor(vendorId, Admin, Now);
+
+        request.Invitations.Count.ShouldBe(1);
+        request.DomainEvents.Count(e => e.Action == nameof(VendorInvited)).ShouldBe(1);
+    }
+
+    [Fact]
+    public void Vendors_cannot_be_invited_to_an_awarded_request()
+    {
+        var request = NewRequest();
+        var quote = SubmitAndReview(request, 1000m);
+        request.ApplyQuoteAction(quote.Id, QuoteAction.Accept, Reviewer, Now);
+
+        Should.Throw<RequestNotEditableException>(() =>
+            request.InviteVendor(Guid.CreateVersion7(), Admin, Now));
+    }
+
+    [Fact]
     public void Identifier_timestamps_come_from_the_injected_clock_and_not_the_wall_clock()
     {
         // UUIDv7 embeds a 48-bit millisecond timestamp in its leading bytes. Asserting on that

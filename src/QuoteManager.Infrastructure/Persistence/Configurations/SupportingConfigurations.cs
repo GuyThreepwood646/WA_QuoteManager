@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using QuoteManager.Domain.Organizations;
 using QuoteManager.Infrastructure.Identity;
 using QuoteManager.Infrastructure.Persistence.Entities;
 
@@ -24,6 +25,13 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
             .HasConversion<string>()
             .HasMaxLength(128)
             .IsRequired();
+
+        // Nullable: platform staff act for no organisation. Restrict rather than cascade, because
+        // deleting an organisation should fail loudly while its people still reference it.
+        builder.HasOne<Organization>()
+            .WithMany()
+            .HasForeignKey(u => u.OrganizationId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 

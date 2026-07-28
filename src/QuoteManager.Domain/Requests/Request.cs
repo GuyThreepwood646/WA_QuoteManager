@@ -31,6 +31,7 @@ public enum RequestStatus
 public sealed class Request : AggregateRoot
 {
     private readonly List<Quote> _quotes = [];
+    private readonly List<RequestInvitation> _invitations = [];
 
     private Request(
         Guid id,
@@ -70,7 +71,21 @@ public sealed class Request : AggregateRoot
 
     public IReadOnlyList<Quote> Quotes => _quotes;
 
+    public IReadOnlyList<RequestInvitation> Invitations => _invitations;
+
     public Guid? AcceptedQuoteId => _quotes.SingleOrDefault(q => q.Status == QuoteStatus.Accepted)?.Id;
+
+    /// <summary>
+    /// Invited vendors who have not yet drafted a quote.
+    /// </summary>
+    /// <remarks>
+    /// The triage signal the invitation list exists to produce: silence is otherwise invisible,
+    /// because a request with no quotes looks identical whether nobody was asked or nobody replied.
+    /// </remarks>
+    public IReadOnlyList<Guid> AwaitingResponseFrom =>
+        [.. _invitations
+            .Select(invitation => invitation.VendorOrganizationId)
+            .Where(vendorId => !_quotes.Exists(quote => quote.VendorOrganizationId == vendorId))];
 
     public static Request Create(
         string title,
@@ -119,6 +134,31 @@ public sealed class Request : AggregateRoot
         Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         NeededBy = neededBy;
         Raise(new RequestUpdated(Id, Title, actor.Id, now));
+    }
+
+    /// <summary>
+    /// Invites a vendor organisation to quote.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent by design: inviting the same vendor twice is a harmless duplicate click, not an
+    /// error worth interrupting a user over, and the composite primary key would reject the second
+    /// row anyway. Returning quietly is kinder than surfacing a constraint violation.
+    /// </remarks>
+    public void InviteVendor(Guid vendorOrganizationId, DomainActor actor, DateTimeOffset now)
+    {
+        if (Status != RequestStatus.Open)
+        {
+            throw new RequestNotEditableException(
+                $"Vendors cannot be invited to a request in state '{Status}'.");
+        }
+
+        if (_invitations.Exists(invitation => invitation.VendorOrganizationId == vendorOrganizationId))
+        {
+            return;
+        }
+
+        _invitations.Add(new RequestInvitation(Id, vendorOrganizationId, now));
+        Raise(new VendorInvited(Id, vendorOrganizationId, actor.Id, now));
     }
 
     public Quote AddQuote(

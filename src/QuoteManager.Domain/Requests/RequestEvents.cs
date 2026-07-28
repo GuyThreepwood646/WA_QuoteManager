@@ -63,6 +63,21 @@ public sealed record RequestCancelled(
     public string Summary => "Request cancelled.";
 }
 
+public sealed record VendorInvited(
+    Guid RequestId,
+    Guid VendorOrganizationId,
+    Guid ActorId,
+    DateTimeOffset OccurredAt) : IDomainEvent
+{
+    public string SubjectType => nameof(Request);
+
+    public Guid SubjectId => RequestId;
+
+    public string Action => nameof(VendorInvited);
+
+    public string Summary => "Invited a vendor to quote.";
+}
+
 public sealed record QuoteDrafted(
     Guid RequestId,
     Guid QuoteId,

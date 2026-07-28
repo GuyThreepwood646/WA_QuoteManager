@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using QuoteManager.Domain.Organizations;
 using QuoteManager.Domain.Requests;
 
 namespace QuoteManager.Infrastructure.Persistence.Configurations;
@@ -23,6 +24,22 @@ public sealed class RequestConfiguration : IEntityTypeConfiguration<Request>
 
         builder.HasIndex(r => r.ClientOrganizationId);
         builder.HasIndex(r => r.Status);
+
+        builder.HasOne<Organization>()
+            .WithMany()
+            .HasForeignKey(r => r.ClientOrganizationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // The invited-vendor list is part of the request aggregate: it is only ever read and
+        // written through the request, so it loads with it and cascades with it.
+        builder.HasMany(r => r.Invitations)
+            .WithOne()
+            .HasForeignKey(i => i.RequestId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.Navigation(r => r.Invitations)
+            .UsePropertyAccessMode(PropertyAccessMode.Field)
+            .AutoInclude();
 
         // Quotes are part of the request aggregate, so they load and save with it and are reached
         // only through it. The backing field is the collection the aggregate actually mutates;
