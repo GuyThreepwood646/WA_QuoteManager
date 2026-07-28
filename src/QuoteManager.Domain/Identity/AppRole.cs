@@ -38,4 +38,15 @@ public static class AppRoleExtensions
     /// and readable statement of who may do what, with no implicit override hidden in code.
     /// </remarks>
     public static bool HasAny(this AppRole actorRoles, AppRole permitted) => (actorRoles & permitted) != AppRole.None;
+
+    /// <summary>
+    /// The individual named roles set within a (possibly combined) flags value.
+    /// </summary>
+    /// <remarks>
+    /// Roles cross the wire as a JWT claim per role and a JSON string array (AD-14), neither of
+    /// which understands a combined flags value, so this is the one place that split happens.
+    /// </remarks>
+    public static IEnumerable<AppRole> Split(this AppRole roles) => AllValues.Where(value => roles.HasAny(value));
+
+    private static readonly AppRole[] AllValues = [AppRole.Admin, AppRole.Requester, AppRole.Reviewer, AppRole.Vendor];
 }

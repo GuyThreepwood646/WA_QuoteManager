@@ -43,19 +43,19 @@ public sealed class AcceptedQuoteIndexTests : IAsyncLifetime
         await _context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO "Organizations" ("Id", "Name", "Kind", "CreatedAt", "Version")
-            VALUES ({0}, 'Acme', 'Client', '2026-07-28T12:00:00+00:00', 1);
+            VALUES ({0}, 'Acme', 'Client', '2026-07-28T12:00:00.0000000Z', 1);
             """.Replace("{0}", Quoted(organizationId)));
 
         await _context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO "Organizations" ("Id", "Name", "Kind", "CreatedAt", "Version")
-            VALUES ({0}, 'Bolt Mechanical', 'Vendor', '2026-07-28T12:00:00+00:00', 1);
+            VALUES ({0}, 'Bolt Mechanical', 'Vendor', '2026-07-28T12:00:00.0000000Z', 1);
             """.Replace("{0}", Quoted(_vendorOrganizationId)));
 
         await _context.Database.ExecuteSqlRawAsync(
             """
             INSERT INTO "Requests" ("Id", "Title", "Description", "ClientOrganizationId", "Status", "NeededBy", "CreatedAt", "Version")
-            VALUES (@id, 'Replace the HVAC units', NULL, @org, 'Open', NULL, '2026-07-28T12:00:00+00:00', 1);
+            VALUES (@id, 'Replace the HVAC units', NULL, @org, 'Open', NULL, '2026-07-28T12:00:00.0000000Z', 1);
             """.Replace("@id", Quoted(_requestId)).Replace("@org", Quoted(organizationId)));
     }
 
@@ -135,7 +135,7 @@ public sealed class AcceptedQuoteIndexTests : IAsyncLifetime
                                   "Notes", "CreatedAt", "StatusChangedAt", "StatusReason",
                                   "AmountMinorUnits", "CurrencyCode", "Version")
             VALUES ({Quoted(Guid.CreateVersion7())}, {Quoted(_requestId)}, {Quoted(_vendorOrganizationId)},
-                    '{status}', NULL, NULL, '2026-07-28T12:00:00+00:00', '2026-07-28T12:00:00+00:00', NULL,
+                    '{status}', NULL, NULL, '2026-07-28T12:00:00.0000000Z', '2026-07-28T12:00:00.0000000Z', NULL,
                     {amountMinorUnits}, 'USD', 1);
             """;
 

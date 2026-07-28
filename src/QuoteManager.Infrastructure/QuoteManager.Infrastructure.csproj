@@ -4,6 +4,18 @@
     <ProjectReference Include="..\QuoteManager.Application\QuoteManager.Application.csproj" />
   </ItemGroup>
 
+  <!-- AD-10: ICurrentUser is implemented over HttpContext.User, which needs the ASP.NET Core
+       abstractions. Infrastructure uses Microsoft.NET.Sdk rather than Sdk.Web, so the shared
+       framework is pulled in via FrameworkReference rather than a NuGet package - the standalone
+       Microsoft.AspNetCore.Http.Abstractions package is frozen at 2.2.0 and superseded by the
+       shared framework for anything targeting modern ASP.NET Core. This framework reference also
+       supersedes the explicit Hosting.Abstractions, Options.ConfigurationExtensions and
+       Identity.Core package references that used to live below - NuGet's reference-pruning flags
+       them as redundant (NU1510) once the framework already carries them. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
@@ -11,9 +23,6 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
-    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
-    <PackageReference Include="Microsoft.Extensions.Identity.Core" />
   </ItemGroup>
 
   <!-- AD-6: the Azure adapter compiles into every build and is selected only when its

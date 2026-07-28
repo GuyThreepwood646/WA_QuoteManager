@@ -32,7 +32,7 @@ public sealed class ReferentialIntegrityTests : IAsyncLifetime
         _clientOrganizationId = Guid.CreateVersion7();
         await ExecuteAsync($"""
             INSERT INTO "Organizations" ("Id", "Name", "Kind", "CreatedAt", "Version")
-            VALUES ({Quoted(_clientOrganizationId)}, 'Acme', 'Client', '2026-07-28T12:00:00+00:00', 1);
+            VALUES ({Quoted(_clientOrganizationId)}, 'Acme', 'Client', '2026-07-28T12:00:00.0000000Z', 1);
             """);
     }
 
@@ -62,7 +62,7 @@ public sealed class ReferentialIntegrityTests : IAsyncLifetime
             INSERT INTO "Requests" ("Id", "Title", "Description", "ClientOrganizationId", "Status",
                                     "NeededBy", "CreatedAt", "Version")
             VALUES ({Quoted(Guid.CreateVersion7())}, 'Orphan', NULL, {Quoted(Guid.CreateVersion7())},
-                    'Open', NULL, '2026-07-28T12:00:00+00:00', 1);
+                    'Open', NULL, '2026-07-28T12:00:00.0000000Z', 1);
             """));
 
         exception.Message.ShouldContain("FOREIGN KEY");
@@ -151,7 +151,7 @@ public sealed class ReferentialIntegrityTests : IAsyncLifetime
             INSERT INTO "Requests" ("Id", "Title", "Description", "ClientOrganizationId", "Status",
                                     "NeededBy", "CreatedAt", "Version")
             VALUES ({Quoted(requestId)}, 'Replace the HVAC units', NULL, {Quoted(_clientOrganizationId)},
-                    'Open', NULL, '2026-07-28T12:00:00+00:00', 1);
+                    'Open', NULL, '2026-07-28T12:00:00.0000000Z', 1);
             """);
         return requestId;
     }
@@ -161,7 +161,7 @@ public sealed class ReferentialIntegrityTests : IAsyncLifetime
         var vendorId = Guid.CreateVersion7();
         await ExecuteAsync($"""
             INSERT INTO "Organizations" ("Id", "Name", "Kind", "CreatedAt", "Version")
-            VALUES ({Quoted(vendorId)}, 'Vendor {vendorId:N}', 'Vendor', '2026-07-28T12:00:00+00:00', 1);
+            VALUES ({Quoted(vendorId)}, 'Vendor {vendorId:N}', 'Vendor', '2026-07-28T12:00:00.0000000Z', 1);
             """);
         return vendorId;
     }
@@ -172,14 +172,14 @@ public sealed class ReferentialIntegrityTests : IAsyncLifetime
                                   "Notes", "CreatedAt", "StatusChangedAt", "StatusReason",
                                   "AmountMinorUnits", "CurrencyCode", "Version")
             VALUES ({Quoted(Guid.CreateVersion7())}, {Quoted(requestId)}, {Quoted(vendorId)},
-                    '{status}', NULL, NULL, '2026-07-28T12:00:00+00:00', '2026-07-28T12:00:00+00:00',
+                    '{status}', NULL, NULL, '2026-07-28T12:00:00.0000000Z', '2026-07-28T12:00:00.0000000Z',
                     NULL, 100000, 'USD', 1);
             """);
 
     private Task InviteAsync(Guid requestId, Guid vendorId) =>
         ExecuteAsync($"""
             INSERT INTO "RequestInvitations" ("RequestId", "VendorOrganizationId", "InvitedAt")
-            VALUES ({Quoted(requestId)}, {Quoted(vendorId)}, '2026-07-28T12:00:00+00:00');
+            VALUES ({Quoted(requestId)}, {Quoted(vendorId)}, '2026-07-28T12:00:00.0000000Z');
             """);
 
     private async Task ExecuteAsync(string sql)

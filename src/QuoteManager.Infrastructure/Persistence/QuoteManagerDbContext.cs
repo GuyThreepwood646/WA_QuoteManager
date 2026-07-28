@@ -3,6 +3,7 @@ using QuoteManager.Domain.Organizations;
 using QuoteManager.Domain.Quotes;
 using QuoteManager.Domain.Requests;
 using QuoteManager.Infrastructure.Identity;
+using QuoteManager.Infrastructure.Persistence.Converters;
 using QuoteManager.Infrastructure.Persistence.Entities;
 
 namespace QuoteManager.Infrastructure.Persistence;
@@ -24,6 +25,16 @@ public sealed class QuoteManagerDbContext(DbContextOptions<QuoteManagerDbContext
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        // Applied as a convention rather than per property so that no future timestamp can be added
+        // in the unsortable default form and quietly break date filtering on that column alone.
+        configurationBuilder.Properties<DateTimeOffset>()
+            .HaveConversion<UtcDateTimeOffsetConverter>();
+
+        base.ConfigureConventions(configurationBuilder);
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
