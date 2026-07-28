@@ -7,7 +7,11 @@ import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 
 import { useAuth } from './auth/AuthProvider'
+import { DashboardPage } from './routes/DashboardPage'
 import { LoginPage } from './routes/LoginPage'
+import { OrganizationsPage } from './routes/OrganizationsPage'
+import { RequestDetailPage } from './routes/RequestDetailPage'
+import { RequestsListPage } from './routes/RequestsListPage'
 
 /**
  * Route table. `/login` renders standalone; every other path requires a session and renders
@@ -97,16 +101,13 @@ function Shell() {
         <main className="flex-1 overflow-y-auto p-6">
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Placeholder name="Dashboard" />} />
-            <Route path="/requests" element={<Placeholder name="Requests" />} />
-            <Route path="/organizations" element={<Placeholder name="Organizations" />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/requests" element={<RequestsListPage />} />
+            <Route path="/requests/:requestId" element={<RequestDetailPage />} />
+            <Route path="/organizations" element={<OrganizationsPage />} />
           </Routes>
         </main>
       </div>
     </div>
   )
-}
-
-function Placeholder({ name }: { name: string }) {
-  return <p className="text-sm text-muted-foreground">{name} — not implemented yet.</p>
 }

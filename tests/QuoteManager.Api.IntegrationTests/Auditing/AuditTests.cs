@@ -82,7 +82,7 @@ public sealed class AuditTests : IDisposable
         var getResponse = await client.GetAsync($"/api/requests/{requestId}/quotes/{quoteId}", ct);
         var before = await getResponse.Content.ReadFromJsonAsync<QuoteResponse>(ct);
 
-        using var message = new HttpRequestMessage(HttpMethod.Post, $"/api/requests/{requestId}/quotes/{quoteId}/actions")
+        using var message = new HttpRequestMessage(HttpMethod.Post, $"/api/requests/{requestId}/quotes/{quoteId}/transitions")
         {
             Content = JsonContent.Create(new { action = "StartReview" }),
         };

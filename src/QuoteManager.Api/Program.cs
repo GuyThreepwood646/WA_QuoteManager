@@ -5,9 +5,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using QuoteManager.Api.Auth;
+using QuoteManager.Api.Dashboard;
 using QuoteManager.Api.ErrorHandling;
 using QuoteManager.Api.Observability;
+using QuoteManager.Api.Organizations;
 using QuoteManager.Api.Quotes;
+using QuoteManager.Api.Requests;
 using QuoteManager.Infrastructure;
 using QuoteManager.Infrastructure.Persistence;
 using Scalar.AspNetCore;
@@ -126,6 +129,9 @@ try
 
     app.MapAuthEndpoints();
     app.MapQuoteEndpoints();
+    app.MapDashboardEndpoints();
+    app.MapRequestEndpoints();
+    app.MapOrganizationEndpoints();
 
     // MapFallbackToFile has the lowest route priority, so every API and OpenAPI route above wins
     // and only genuine client-side routes (e.g. /dashboard, with no matching physical file) fall

@@ -36,7 +36,7 @@ public static class QuoteEndpoints
         // AD-2: the one action-driven transition endpoint. No [Authorize(Roles = ...)] here or
         // anywhere near it - QuoteTransitions.Resolve, called inside ApplyQuoteAction, is the only
         // authority on whether the actor's roles permit this action.
-        group.MapPost("/actions", ApplyActionAsync);
+        group.MapPost("/transitions", ApplyActionAsync);
     }
 
     private static async Task<IResult> GetQuoteAsync(

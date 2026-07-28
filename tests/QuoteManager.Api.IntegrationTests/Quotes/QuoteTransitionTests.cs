@@ -99,7 +99,7 @@ public sealed class QuoteTransitionTests : IDisposable
 
         using var message = new HttpRequestMessage(
             HttpMethod.Post,
-            $"/api/requests/{requestId}/quotes/{quoteId}/actions")
+            $"/api/requests/{requestId}/quotes/{quoteId}/transitions")
         {
             Content = JsonContent.Create(new { action = "StartReview" }),
         };
@@ -154,7 +154,7 @@ public sealed class QuoteTransitionTests : IDisposable
     {
         using var message = new HttpRequestMessage(
             HttpMethod.Post,
-            $"/api/requests/{requestId}/quotes/{quoteId}/actions")
+            $"/api/requests/{requestId}/quotes/{quoteId}/transitions")
         {
             Content = JsonContent.Create(new { action }),
         };
