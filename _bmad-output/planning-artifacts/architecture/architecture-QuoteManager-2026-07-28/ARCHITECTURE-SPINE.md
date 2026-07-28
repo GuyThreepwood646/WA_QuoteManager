@@ -92,6 +92,7 @@ stateDiagram-v2
 - **Binds:** FR-5, FR-4
 - **Prevents:** the audit trail disagreeing with committed state, and "what happened" being scattered across controllers where each endpoint decides for itself what is worth recording
 - **Rule:** Every state-changing operation appends `AuditEntry` rows **in the same transaction** as the change, derived from the same domain events that feed the outbox — so audit cannot be skipped by a code path that forgets to log. Actor identity comes from the authenticated principal only. Serilog and OpenTelemetry output are diagnostics and are explicitly **not** the audit source of truth; audit queries never read log files. The per-request activity timeline that satisfies FR-4 reads `AuditEntry` directly.
+- **Status:** implemented as `AuditInterceptor : SaveChangesInterceptor` (`Infrastructure/Persistence/Auditing`), attached to every `QuoteManagerDbContext`. Scans `ChangeTracker.Entries<AggregateRoot>()` for pending domain events inside `SavingChangesAsync`, so the extra inserts land in the same batch as the change. Actor display names resolve correctly for the `DomainActor.System` sentinel, for `AppUser` rows created earlier in the *same* save (the seeder's own accounts), and for existing users. `AuditTests` verifies both the full seed run and a live API-driven transition. The outbox half of AD-4 this interceptor will eventually also drive is not built yet (tier 2).
 
 ### AD-6 — Messaging has a local default adapter and a configuration-gated Azure adapter; persistence does not
 
