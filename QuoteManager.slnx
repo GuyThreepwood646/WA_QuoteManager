@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/QuoteManager.Api/QuoteManager.Api.csproj" />
+    <Project Path="src/QuoteManager.Application/QuoteManager.Application.csproj" />
+    <Project Path="src/QuoteManager.Domain/QuoteManager.Domain.csproj" />
+    <Project Path="src/QuoteManager.Infrastructure/QuoteManager.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/QuoteManager.Api.IntegrationTests/QuoteManager.Api.IntegrationTests.csproj" />
+    <Project Path="tests/QuoteManager.Architecture.Tests/QuoteManager.Architecture.Tests.csproj" />
+    <Project Path="tests/QuoteManager.Domain.Tests/QuoteManager.Domain.Tests.csproj" />
+  </Folder>
+</Solution>

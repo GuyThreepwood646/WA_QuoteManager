@@ -1,0 +1,7 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- AD-1: the Domain references no other project and no third-party package.
+       QuoteManager.Architecture.Tests asserts this, so a casual `dotnet add package` here
+       fails the build rather than passing review unnoticed. -->
+
+</Project>

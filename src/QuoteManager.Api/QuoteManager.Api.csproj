@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <UserSecretsId>quotemanager-api</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\QuoteManager.Application\QuoteManager.Application.csproj" />
+    <ProjectReference Include="..\QuoteManager.Infrastructure\QuoteManager.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- The SPA is generated output, so wwwroot is not committed. Building the client as part of a
+       Release build is what lets a reviewer clone the repository and run `dotnet run -c Release`
+       without knowing anything about npm. Debug builds deliberately skip this so the inner loop
+       stays fast: during development the Vite dev server serves the client instead. -->
+  <PropertyGroup>
+    <SpaRoot>..\QuoteManager.Web\</SpaRoot>
+    <BuildSpa Condition="'$(BuildSpa)' == '' AND '$(Configuration)' == 'Release'">true</BuildSpa>
+  </PropertyGroup>
+
+  <Target Name="RestoreSpaPackages"
+          Condition="'$(BuildSpa)' == 'true' AND !Exists('$(SpaRoot)node_modules')"
+          BeforeTargets="BuildSpaBundle">
+    <Message Importance="high" Text="Installing client dependencies (npm ci)..." />
+    <Exec Command="npm ci" WorkingDirectory="$(SpaRoot)" />
+  </Target>
+
+  <Target Name="BuildSpaBundle" Condition="'$(BuildSpa)' == 'true'" BeforeTargets="Build">
+    <Message Importance="high" Text="Building client bundle into wwwroot..." />
+    <Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
+  </Target>
+
+</Project>

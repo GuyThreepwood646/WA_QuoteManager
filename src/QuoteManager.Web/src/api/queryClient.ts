@@ -1,0 +1,22 @@
+import { QueryClient } from '@tanstack/react-query'
+
+/**
+ * TanStack Query owns all server state (AD-7 / conventions): nothing fetched from the API is
+ * mirrored into component state, so there is exactly one copy of the truth on the client.
+ */
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Quote lifecycle data is the kind of thing another user changes while you are looking at it,
+      // so refetching on focus is a feature here rather than noise.
+      refetchOnWindowFocus: true,
+      staleTime: 10_000,
+      retry: 1,
+    },
+    mutations: {
+      // A rejected transition is a legitimate domain answer (AD-8), never a transient fault, so
+      // retrying it would only produce a second identical rejection.
+      retry: false,
+    },
+  },
+})

@@ -1,0 +1,73 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!-- Application / Infrastructure -->
+  <ItemGroup>
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Identity.Core" Version="10.0.10" />
+  </ItemGroup>
+
+  <!-- Persistence -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" />
+  </ItemGroup>
+
+  <!-- API surface, auth, observability -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
+    <PackageVersion Include="Scalar.AspNetCore" Version="2.16.16" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+  <!-- Azure adapters. Present in the build, activated only when a connection string exists. -->
+  <ItemGroup>
+    <PackageVersion Include="Azure.Messaging.ServiceBus" Version="7.20.2" />
+    <PackageVersion Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.6.0" />
+  </ItemGroup>
+
+  <!-- Test stack -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <PackageVersion Include="Shouldly" Version="4.3.0" />
+    <PackageVersion Include="NSubstitute" Version="6.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+  </ItemGroup>
+
+  <!-- SECURITY PINS (transitive dependencies we do not reference directly).
+       Both are high-severity advisories introduced by packages the .NET templates and EF Core
+       pull in by default. Pinning here is deliberate: `dotnet restore` reports them as NU1903
+       warnings, and CI treats warnings as errors, so leaving them unpinned would fail the build.
+
+       Microsoft.OpenApi — Microsoft.AspNetCore.OpenApi 10.0.10 depends on 2.0.0, which falls
+       inside GHSA-v5pm-xwqc-g5wc (circular schema references can terminate OpenAPI parsing).
+       The 2.x line is patched at 2.7.5; staying on 2.x preserves the API surface that
+       Microsoft.AspNetCore.OpenApi was compiled against, whereas 3.x is a breaking line.
+
+       SQLitePCLRaw.lib.e_sqlite3 — Microsoft.EntityFrameworkCore.Sqlite 10.0.10 resolves 2.1.11,
+       which is inside GHSA-2m69-gcr7-jv3q (vulnerable bundled SQLite). 2.1.12 is the first
+       release outside the affected range and stays within the 2.1.x line the bundle expects.
+
+       Remove each pin once the referencing package itself depends on a patched version. -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
+    <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12" />
+  </ItemGroup>
+
+</Project>

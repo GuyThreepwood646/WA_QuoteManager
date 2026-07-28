@@ -1,0 +1,12 @@
+<Project>
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <!-- CA1707 objects to underscores in member names. Underscored test names are the xUnit
+         convention and read far better in failure output, so the rule is off for tests only.
+         CA1859 (prefer concrete return types) optimises call sites that do not matter here. -->
+    <NoWarn>$(NoWarn);CA1707;CA1859</NoWarn>
+  </PropertyGroup>
+
+</Project>
