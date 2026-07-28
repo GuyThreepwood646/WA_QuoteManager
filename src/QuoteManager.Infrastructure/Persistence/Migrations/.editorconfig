@@ -1,0 +1,12 @@
+# EF Core generates and regenerates everything in this folder. Holding generated code to the
+# hand-written analyzer bar is a fight that restarts on every `dotnet ef migrations add`, and
+# "fixing" a migration by hand risks changing what it applies. Analysis is therefore relaxed here
+# and nowhere else, so the rest of Infrastructure keeps the full bar.
+
+[*.cs]
+generated_code = true
+
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1062.severity = none
+dotnet_diagnostic.IDE0300.severity = none
+dotnet_diagnostic.IDE0301.severity = none
