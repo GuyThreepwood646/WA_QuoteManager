@@ -7,6 +7,7 @@ import { BrowserRouter } from 'react-router'
 
 import { App } from './App'
 import { queryClient } from './api/queryClient'
+import { AuthProvider } from './auth/AuthProvider'
 import { theme } from './theme'
 
 import '@mantine/core/styles.css'
@@ -23,7 +24,9 @@ createRoot(container).render(
     <MantineProvider theme={theme} defaultColorScheme="light">
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <App />
+          <AuthProvider>
+            <App />
+          </AuthProvider>
         </BrowserRouter>
         <ReactQueryDevtools initialIsOpen={false} />
       </QueryClientProvider>

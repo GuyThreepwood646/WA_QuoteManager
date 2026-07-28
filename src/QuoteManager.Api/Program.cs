@@ -101,6 +101,16 @@ try
     app.UseExceptionHandler();
     app.UseStatusCodePages();
 
+    // Serves the built React bundle from wwwroot so a Release run is a single process on a single
+    // origin — no CORS configuration, no second server to start during a demo. In development the
+    // Vite dev server proxies to this host instead, so the browser still sees one origin.
+    // Positioned ahead of authentication/authorisation, not just given AllowAnonymous() below: the
+    // authorisation middleware applies the deny-by-default fallback policy to *every* request that
+    // reaches it, including ones bound for a static file that never resolves to a routed endpoint,
+    // so a physical asset request would 401 before UseStaticFiles ever got a chance to serve it.
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+
     app.UseAuthentication();
     app.UseAuthorization();
 
@@ -117,13 +127,9 @@ try
     app.MapAuthEndpoints();
     app.MapQuoteEndpoints();
 
-    // Serves the built React bundle from wwwroot so a Release run is a single process on a single
-    // origin — no CORS configuration, no second server to start during a demo. In development the
-    // Vite dev server proxies to this host instead, so the browser still sees one origin.
     // MapFallbackToFile has the lowest route priority, so every API and OpenAPI route above wins
-    // and only genuine client-side routes fall through to the SPA.
-    app.UseDefaultFiles();
-    app.UseStaticFiles();
+    // and only genuine client-side routes (e.g. /dashboard, with no matching physical file) fall
+    // through to it.
     app.MapFallbackToFile("/index.html").AllowAnonymous();
 
     Log.Information("QuoteManager API starting in {Environment}", app.Environment.EnvironmentName);
