@@ -50,7 +50,8 @@ The dotted edges are the only permitted outward references, and only from `Progr
 
 - **Binds:** FR-2, FR-3, every quote mutation path
 - **Prevents:** transition rules being re-implemented per endpoint or per screen, and the set of transitions the UI offers drifting from the set the API will accept
-- **Rule:** A single static table mapping `(QuoteStatus, QuoteAction)` to a resulting `QuoteStatus` lives in `Domain` and is the only place a legal transition is expressed. All mutation flows through `Request.ApplyQuoteAction(quoteId, action, actor, occurredAt)`. The HTTP surface exposes **one** action-driven transition endpoint per quote, never a verb-per-status family of endpoints. An action absent from the table is rejected as a domain violation, never silently ignored.
+- **Rule:** A single static table lives in `Domain` and is the only place a legal transition is expressed. It maps `(QuoteStatus, QuoteAction)` to a resulting `QuoteStatus` **and the roles permitted to invoke it** — the role axis lives in the table, not in endpoint attributes, because AD-7 promises an actor-aware action set and two sources of truth for "who may do this" is exactly the drift AD-2 exists to prevent. The Domain exposes exactly one function, `QuoteTransitions.PermittedFor(status, actorRoles)`, and **both** the endpoint's authorisation check and the AD-7 projection call it. No `Roles = "..."` string literal may appear on a transition endpoint. All mutation flows through `Request.ApplyQuoteAction(quoteId, action, actor, occurredAt)`. The HTTP surface exposes **one** action-driven transition endpoint per quote, never a verb-per-status family of endpoints. An action absent from the table is rejected as a domain violation, never silently ignored.
+- **Rule (field mutability):** AD-2 governs data changes as well as status changes, because an amount that stays editable after submission makes the whole review lifecycle meaningless. A quote's business fields are mutable only in `Draft`; a request's only while it has no submitted quotes. Every other edit is rejected as a domain violation with code `quote.not_editable` or `request.not_editable`. **Nothing is ever hard-deleted** — removal is expressed as a lifecycle action (`Withdraw`) so the audit trail stays complete.
 
 ```mermaid
 stateDiagram-v2
@@ -81,8 +82,8 @@ stateDiagram-v2
 ### AD-4 — A transactional outbox is the only path by which anything leaves the process
 
 - **Binds:** all domain events, all messaging
-- **Prevents:** a committed state change whose event never published (crash between commit and send), and a published event for a transaction that rolled back — the two failure modes that make an event-driven audit trail untrustworthy
-- **Rule:** Use-case handlers never call a broker. Aggregates raise domain events; a `SaveChangesAsync` interceptor serialises them into an `OutboxMessages` row inside the same transaction as the state change. One `OutboxDispatcher` hosted service claims unsent rows in insertion order and hands each to the `IIntegrationEventPublisher` port, marking them dispatched only on success. Delivery is therefore **at-least-once**, so every consumer must be idempotent keyed on `OutboxMessage.Id`.
+- **Prevents:** external side effects diverging from committed state — a notification lost because the process crashed between commit and send, or a phantom effect fired for a transaction that then rolled back. It guarantees that effects outside the consistency boundary happen exactly when, and only when, the state change committed. (It is explicitly *not* what makes the audit trail trustworthy; AD-5's audit is a transactional projection that does not depend on the outbox at all.)
+- **Rule:** Use-case handlers never call a broker. Aggregates raise domain events; a `SaveChangesAsync` interceptor writes **all** of them to `AuditEntry` per AD-5, and writes to `OutboxMessages` **only** those events named in an explicit integration-event allow-list living in one file in `Application`. A domain event absent from that list never leaves the process — the queue carries out-of-boundary integration events, not an undifferentiated firehose of internal state changes. Integration-event payloads are versioned contracts and never expose Domain types directly. One `OutboxDispatcher` hosted service claims unsent rows in insertion order and hands each to the `IIntegrationEventPublisher` port, marking them dispatched only on success. Delivery is therefore **at-least-once**, so every consumer must be idempotent keyed on `OutboxMessage.Id`.
 
 ### AD-5 — Audit is a transactional projection of domain events; diagnostic logging is not audit
 
@@ -90,17 +91,20 @@ stateDiagram-v2
 - **Prevents:** the audit trail disagreeing with committed state, and "what happened" being scattered across controllers where each endpoint decides for itself what is worth recording
 - **Rule:** Every state-changing operation appends `AuditEntry` rows **in the same transaction** as the change, derived from the same domain events that feed the outbox — so audit cannot be skipped by a code path that forgets to log. Actor identity comes from the authenticated principal only. Serilog and OpenTelemetry output are diagnostics and are explicitly **not** the audit source of truth; audit queries never read log files. The per-request activity timeline that satisfies FR-4 reads `AuditEntry` directly.
 
-### AD-6 — Every outbound dependency has a local default adapter and a configuration-gated cloud adapter
+### AD-6 — Messaging has a local default adapter and a configuration-gated Azure adapter; persistence does not
 
-- **Binds:** messaging, telemetry, persistence, notification
+- **Binds:** messaging and telemetry only
 - **Prevents:** the demo path and the deployed path being different code, and a missing or unreachable cloud resource turning into a start-up crash
-- **Rule:** Each port in `Application/Abstractions` has exactly two implementations: a local one requiring no external service, used by default, and an Azure one selected **only** when its connection string is present in configuration. Selection happens in one composition-root file, never scattered across registrations. The absence of a connection string is a supported, tested configuration — not an exception. Both adapters for a port are verified by the same contract test suite, so the local adapter cannot quietly diverge from the cloud one.
+- **Rule:** **`IIntegrationEventPublisher` is the one port with two adapters** — an in-process channel adapter used by default and an Azure Service Bus adapter selected **only** when its connection string is present. Telemetry is not a second adapter pair but an OpenTelemetry exporter swap on the same pipeline, gated the same way. Selection happens in one composition-root file, never scattered across registrations. The absence of a connection string is a supported, tested configuration — not an exception.
+- **Rule (persistence is explicitly excluded):** persistence has **exactly one** provider in this build, SQLite. Substituting SQL Server is a migration-set problem, not an adapter problem, and is named under Deferred. A story author must not build a second persistence adapter.
+- **Rule (verification, executable without a subscription):** the port's contract test suite runs against the local adapter in CI. The Service Bus adapter is compile-verified and covered by a contract test carrying `[Trait("Requires","Azure")]` that is excluded from the default run. The part that actually carries risk — adapter selection — is covered by a configuration test asserting that an absent connection string resolves the local adapter and a present one resolves the Azure adapter. Because the Azure subscription is inactive by stated constraint, a rule demanding live cloud verification would simply be ignored, which is the worst possible fate for a spine rule.
 
 ### AD-7 — The client encodes no domain rules; the server projects the permitted action set
 
 - **Binds:** the entire React application, every quote and request response
 - **Prevents:** the UI offering an action the API will reject, or hiding a legal one — the single most likely divergence between the two halves of this build, and the one the brief explicitly tests
-- **Rule:** Every quote representation crossing the wire carries `permittedActions`, computed server-side from the AD-2 table for the current actor and state. UI controls are rendered by mapping over that array. No TypeScript may branch on `status` to decide what a user may do, and the lifecycle table is never duplicated client-side. Client-side validation is confined to shape and format; every business rule is server-verified.
+- **Rule:** Every quote representation crossing the wire carries `permittedActions`, computed server-side by `QuoteTransitions.PermittedFor` (AD-2) for the current actor's roles and the current state. UI controls are rendered by mapping over that array. No TypeScript may branch on `status` **or on role** to decide what a user may do, and the lifecycle table is never duplicated client-side. Client-side validation is confined to shape and format; every business rule is server-verified.
+- **Rule (non-transition capabilities travel the same channel):** `permittedActions` also carries the capabilities that are not status transitions — `Edit`, `AddQuote` — derived from AD-2's mutability rule. Without this the frontend has nothing to render an edit control from and a developer is pushed straight back into the `status`-branching this AD forbids, so the single source of truth has to cover every action the UI can offer, not just lifecycle ones.
 
 ### AD-8 — Errors cross the boundary as RFC 9457 problem details with a stable machine code
 
@@ -112,7 +116,8 @@ stateDiagram-v2
 
 - **Binds:** every endpoint, FR-5 actor capture
 - **Prevents:** a mix of auth schemes appearing as the app grows, and a newly added endpoint shipping unprotected because nobody remembered the attribute
-- **Rule:** Exactly one authentication scheme: JWT bearer, HS256, signed with a key from configuration. A fallback authorisation policy requires an authenticated user for **every** endpoint, so protection is the default and anonymity is opt-in via explicit `AllowAnonymous` on login and health only. Role gates are declared per endpoint. Password hashing uses the ASP.NET Core Identity `PasswordHasher`, never a hand-rolled scheme. Refresh tokens and revocation are deliberately out of scope for this build and named under Deferred.
+- **Rule:** Exactly one authentication scheme: JWT bearer, HS256, signed with a key from configuration. A fallback authorisation policy requires an authenticated user for **every** endpoint, so protection is the default and anonymity is opt-in. Password hashing uses the ASP.NET Core Identity `PasswordHasher`, never a hand-rolled scheme. Refresh tokens and revocation are deliberately out of scope for this build and named under Deferred.
+- **Rule (the complete anonymous set, enumerated):** a fallback policy applies to every *endpoint*, and `MapFallbackToFile("index.html")` is an endpoint — so a naive "login and health only" enumeration returns 401 for `/` and `/login` and the demo cannot start at all. Exactly these are anonymous, and nothing else: the login endpoint, the health endpoints, **the SPA fallback route and its static assets**, **the OpenAPI document**, and **the Scalar reference UI**. The last two matter because a reviewer from a fresh clone is most likely to open the API reference first. Enforcement is a test, not this prose: an integration test asserts unauthenticated `GET /`, `GET /login`, `GET /health`, and `GET /openapi/v1.json` all return 200 while a representative API route returns 401.
 
 ### AD-10 — Actor identity comes only from the authenticated principal
 
@@ -132,22 +137,63 @@ stateDiagram-v2
 - **Prevents:** two projects resolving different versions of the same package, and a known-vulnerable transitive dependency shipping because nobody read the restore warnings
 - **Rule:** `ManagePackageVersionsCentrally` is on; no `PackageReference` may carry an inline `Version` attribute, and an architecture test fails the build if one appears. `CentralPackageTransitivePinningEnabled` is on so a vulnerable transitive can be raised without making it a direct reference, and every such pin carries a comment naming its advisory and the condition for removing it. CI builds with `-warnaserror`, which promotes NuGet audit findings (`NU1903`) to build failures — so an unpatched advisory cannot merge. Two are pinned today: `Microsoft.OpenApi` to 2.7.5 and `SQLitePCLRaw.lib.e_sqlite3` to 2.1.12, both dragged in by the .NET templates and EF Core respectively.
 
+### AD-13 — Roles are a closed set, and row-level read scope is stated rather than deferred
+
+- **Binds:** AD-2, AD-7, every endpoint
+- **Prevents:** the endpoint story expressing authorisation as `[Authorize(Roles = ...)]` while the projection story computes `permittedActions` from status alone — which makes the UI offer actions the API answers with 403: the same class of failure AD-7 exists to prevent, merely with a different status code
+- **Rule:** Four roles, closed: `Admin` (everything), `Requester` (creates and manages requests for a client organisation), `Reviewer` (may `StartReview`, `Accept`, `Reject`, `ReturnToSubmitted`), `Vendor` (may create, submit, and `Withdraw` quotes belonging to its own organisation). `Organization.Kind` distinguishes client from vendor, so the two roles one entity plays are explicit in the schema rather than inferred. Roles are claims on the JWT and are the only authorisation input, per AD-10.
+- **Rule (row-level posture, affirmative):** in this build **every authenticated user reads all data**; there is no per-organisation read filter. This is a deliberate scope decision and it is stated in the README and the demo script so it is never mistaken for an oversight. Org-scoped read filtering via an EF global query filter is named under Deferred. Write authorisation is *not* relaxed — AD-2's role axis governs every mutation.
+
+### AD-14 — One `apiClient` is the only place the SPA originates a request or holds a token
+
+- **Binds:** the entire React application
+- **Prevents:** the highest-multiplicity gap available in this build — with one API client module per resource, every undecided auth question (where the token lives, how it is attached, what happens on 401) gets re-decided independently in every module
+- **Rule:** `POST /api/auth/login` returns `{ accessToken, expiresAt, user: { id, displayName, roles } }`. Token lifetime is **8 hours** — long enough that expiry cannot interrupt a demo or a reviewer's evaluation, short enough to defend.
+- **Rule (storage, with the trade-off stated):** the token is held in memory by one `AuthProvider` and rehydrated from `sessionStorage` so refreshing the page does not log the reviewer out. `sessionStorage` is readable by injected script, so this trades XSS exposure for demo usability; it is recorded here as a deliberate choice, and an `HttpOnly` cookie with CSRF protection is the production answer named under Deferred.
+- **Rule (single egress):** exactly one `apiClient` wrapper attaches `Authorization: Bearer`, parses RFC 9457 problem details into a typed error, and is **the only place in the SPA where a network request originates**. Generated resource modules call it and never touch `fetch` or `axios` directly; this is lint-enforced via `no-restricted-globals` and `no-restricted-imports`, because a convention that only exists in prose is not a rule. On 401: clear auth state, clear the TanStack Query cache, redirect to `/login`. On 403: render a not-permitted state without logging out.
+
+### AD-15 — Every transition is concurrency-checked, not just Accept
+
+- **Binds:** FR-3, AD-2, AD-3
+- **Prevents:** two reviewers acting on the same `Submitted` quote both reading that status, both passing the transition table, and both committing — last write wins, and the audit trail then faithfully records two successful transitions out of one source state, which is visibly wrong in the exact artifact built to prove correctness
+- **Rule:** AD-3 guards the `Accept` race specifically; that rigour has to be uniform rather than exceptional. `Quote` and `Request` each carry an `int Version` marked `IsConcurrencyToken()`, incremented inside `ApplyQuoteAction`. **SQLite has no `rowversion`**, so EF Core cannot supply this automatically and a story author reaching for `IsRowVersion()` will fail and improvise — hence an explicit integer token is named here. Quote reads return it as a weak `ETag`; the transition endpoint requires `If-Match`; `DbUpdateConcurrencyException` maps through AD-8 to 409 `quote.concurrent_modification`.
+
+### AD-16 — Migrations are the only schema authority, and the seed makes the demo meaningful
+
+- **Binds:** the fresh-clone run contract, FR-4
+- **Prevents:** the two wrong turns that each independently defeat the hard "must run from a fresh clone" constraint — `EnsureCreated()`, which silently skips migration history and therefore never creates AD-3's filtered unique index, and an unseeded database, which leaves a reviewer staring at a login screen holding no valid credentials
+- **Rule:** Migrations are committed to the repository and are the only schema authority; **`EnsureCreated` is banned**. `MigrateAsync` plus an idempotent seeder run at start-up, guarded to the Development and Demo environments. The SQLite file path is fixed and gitignored.
+- **Rule (the seed is load-bearing, not decoration):** a triage dashboard over an empty database demonstrates nothing, so the seeder produces one user per AD-13 role with credentials documented in the README, two client organisations and two vendor organisations, and requests whose quotes occupy **every** lifecycle state — including one near expiry and one request carrying several competing quotes, so the AD-3 single-accepted invariant can be demonstrated live rather than described.
+
+## Delivery Order
+
+Two days including rehearsal is the binding constraint, and a spine that is correct but unbuildable in the time available has failed. This ordering exists so that time pressure truncates the tail rather than gutting the middle. Ship each tier completely before starting the next.
+
+| Tier | Contents | Rationale |
+| --- | --- | --- |
+| 1 — Demo-critical | Auth and login (AD-9, AD-13, AD-14); the three entities; the AD-2 transition table with role axis and `permittedActions`; the AD-3 single-accepted invariant; AD-5 audit; the FR-4 triage dashboard; AD-16 migrations and seed | This is the brief. Without any one of these there is no demo. |
+| 2 — Differentiators | AD-4 outbox plus the Service Bus adapter and its selection test; OpenTelemetry and Azure Monitor exporter; AD-15 concurrency tokens | This is where the role-derived Azure and production-mindedness signals live. Valuable, but the demo survives their absence. |
+| 3 — Reviewable artifacts | Dockerfile and compose file, GitHub Actions CI, README and demo script | The demo never executes the container, so these are read rather than run. |
+
+Deliberate reductions taken against the original mandate, each recovering build time without weakening a signal: AD-6 now binds one dual-adapter port instead of four; `Expire` is a manual action plus a stored `ExpiresAt` that projections read, which removes an entire hosted service along with its transactional and idempotency questions while leaving expiry equally visible in the dashboard; and there is one log pipeline, not two in parallel.
+
 ## Consistency Conventions
 
 | Concern | Convention |
 | --- | --- |
 | Project and namespace naming | `QuoteManager.<Layer>`; folders by feature inside Application (`Features/Quotes`), by technology inside Infrastructure (`Persistence`, `Messaging`, `Telemetry`) |
 | Entities and events | Entities singular PascalCase; EF table names plural; domain events named `<Aggregate><PastTenseVerb>` such as `QuoteAccepted`; ports named `I<Capability>`; adapters named `<Technology><Capability>` such as `ServiceBusIntegrationEventPublisher` |
-| Identifiers | `Guid` created with `Guid.CreateVersion7()` in the Domain, never database-generated; UUIDv7 sorts monotonically so it does not fragment the clustered index; serialised lowercase dashed |
+| Identifiers | `Guid` created with `Guid.CreateVersion7(timeProvider.GetUtcNow())` in the Domain, never database-generated and never from the parameterless overload; UUIDv7 embeds a timestamp, so passing the injected clock is what keeps identifiers reproducible under `FakeTimeProvider` instead of silently reintroducing wall-clock time through the back door; sorts monotonically so it does not fragment the clustered index; serialised lowercase dashed |
 | Dates and time | `DateTimeOffset` in UTC everywhere, obtained from the injected `TimeProvider`; ISO 8601 on the wire; `DateTime.Now` and `DateTime.UtcNow` are banned in application and domain code |
 | Money | `decimal` mapped to `decimal(18,2)` plus an explicit ISO-4217 currency code column; floating-point types are banned for monetary values |
 | HTTP surface | Plural noun resources under `/api`; state changes as `POST /api/requests/{requestId}/quotes/{quoteId}/transitions` with the action in the body; collections always wrapped as an object with `items`, `page`, `pageSize`, `total`, never a bare JSON array |
+| List queries | The request side is pinned as tightly as the response envelope, because the spine mandates several independent list surfaces (requests, quotes, audit timeline, dashboard views) that different stories will build and the generated-client-per-resource convention then hardens each variant into its own module. Exactly one shape: `?page=1&pageSize=25&sort=-createdAt&<filter>=<value>`. `page` is **1-based**; `pageSize` defaults to 25 and is **clamped** to a maximum of 100 rather than rejected; sort direction is a leading `-`; each endpoint declares a closed allow-list of sortable fields and answers anything else with 400 rather than silently ignoring it. One shared `PagedQuery` binding type and one `PagedResult<T>` serve every list endpoint including the audit timeline. Offset paging is deliberate at these volumes; keyset paging is the revisit |
 | Errors | RFC 9457 problem details with a stable `code`, per AD-8 |
 | Logging | Serilog structured logging with message templates and named properties, never string interpolation; every entry enriched with trace id and user id; no personally identifying data beyond display name |
 | Configuration | Bound to typed options via `IOptions<T>`; `IConfiguration` is read only in the composition root; no secret is ever committed, and the development signing key lives only in `appsettings.Development.json` |
 | Validation | FluentValidation at the API edge for shape and format; invariants live in the Domain and throw typed domain exceptions |
 | Asynchrony | Every I/O path is async and threads the request `CancellationToken`; `.Result` and `.Wait()` are banned |
-| Tests | xUnit v3 with Shouldly assertions and NSubstitute fakes; Domain tests instantiate no infrastructure and touch no database |
+| Tests | xUnit v3 with Shouldly assertions and NSubstitute fakes; Domain tests instantiate no infrastructure and touch no database. xUnit v3 can run under either VSTest or the Microsoft Testing Platform, and a mismatched runner reports success while discovering nothing, so every test project declares `xunit.runner.visualstudio` alongside `Microsoft.NET.Test.Sdk`, and CI asserts a non-zero test count rather than trusting the exit code |
 | Frontend | Components PascalCase, hooks `use<Thing>`, one generated API client module per resource; server state owned by TanStack Query and never mirrored into component state |
 
 ## Stack
@@ -170,10 +216,12 @@ Verified against the NuGet flat-container API and the npm registry on 2026-07-28
 | Scalar.AspNetCore | 2.16.16 |
 | FluentValidation (+ DependencyInjectionExtensions) | 12.1.1 |
 | xunit.v3 | 3.2.2 |
+| xunit.runner.visualstudio | 3.1.5 |
 | Microsoft.NET.Test.Sdk | 18.8.1 |
 | Microsoft.AspNetCore.Mvc.Testing | 10.0.10 |
-| Shouldly | 4.3.0 |
+| Shouldly (not FluentAssertions, which requires a paid commercial licence from v8) | 4.3.0 |
 | NSubstitute | 6.0.0 |
+| Microsoft.Extensions.TimeProvider.Testing (`FakeTimeProvider`) | 10.8.0 |
 | coverlet.collector | 10.0.1 |
 | Microsoft.OpenApi (transitive security pin, GHSA-v5pm-xwqc-g5wc) | 2.7.5 |
 | SQLitePCLRaw.lib.e_sqlite3 (transitive security pin, GHSA-2m69-gcr7-jv3q) | 2.1.12 |
@@ -183,8 +231,12 @@ Verified against the NuGet flat-container API and the npm registry on 2026-07-28
 | Vite | 8.1.5 |
 | @vitejs/plugin-react | 6.0.4 |
 | Mantine (core, hooks, form, dates) | 9.5.0 |
+| dayjs (peer dependency of `@mantine/dates`) | 1.11.21 |
 | TanStack Query | 5.101.4 |
-| React Router | 8.3.0 |
+| `react-router` (v7-consolidated package, not `react-router-dom`) | 7.18.1 |
+| oxlint | 1.76.0 |
+
+**Node floor.** The toolchain floor is Node 20.19 / 22.12, set by Vite 8. `react-router` is deliberately held at 7.18.1 rather than 8.x because 8.x declares `engines.node >= 22.22.0`, which fails `npm install --engine-strict` and every engine-enforcing CI image on anything older — including the local 22.18.0. Raising the repository's Node floor by a patch-level accident of one routing library, in a deliverable whose entire premise is that a reviewer can clone and run it, is a bad trade. The v7 package exports the same `BrowserRouter` / `Routes` / `Route` / `NavLink` surface this app uses, so the constraint costs nothing.
 
 ## Structural Seed
 
@@ -196,6 +248,39 @@ erDiagram
     ORGANIZATION ||--o{ QUOTE : "supplies"
     REQUEST ||--o{ QUOTE : "receives"
     APP_USER ||--o{ AUDIT_ENTRY : "performed"
+    ORGANIZATION {
+        uuid Id
+        string Name
+        string Kind
+    }
+    APP_USER {
+        uuid Id
+        string Email
+        string DisplayName
+        string PasswordHash
+        string Roles
+        uuid OrganizationId
+    }
+    REQUEST {
+        uuid Id
+        string Title
+        string Status
+        uuid ClientOrganizationId
+        datetime NeededBy
+        datetime CreatedAt
+        int Version
+    }
+    QUOTE {
+        uuid Id
+        uuid RequestId
+        uuid VendorOrganizationId
+        string Status
+        decimal Amount
+        string CurrencyCode
+        datetime ExpiresAt
+        datetime CreatedAt
+        int Version
+    }
     OUTBOX_MESSAGE {
         uuid Id
         string Type
@@ -212,7 +297,11 @@ erDiagram
     }
 ```
 
-`Organization` fills two distinct roles: a `Request` is raised on behalf of a client organisation, and each `Quote` is supplied by a vendor organisation. `AuditEntry` addresses its subject polymorphically through `SubjectType` plus `SubjectId` so one table covers organisations, requests, and quotes.
+`Organization` fills two distinct roles, made explicit by `Kind`: a `Request` is raised on behalf of a client organisation, and each `Quote` is supplied by a vendor organisation. `AuditEntry` addresses its subject polymorphically through `SubjectType` plus `SubjectId` so one table covers organisations, requests, and quotes.
+
+Attributes are listed for all four business entities, not just the infrastructure tables, because these are the columns every FR-1 story touches: leaving them unstated is how the money convention gets applied inconsistently and how `ExpiresAt` — implied by AD-2's `Expire` action and by AD-11's proximity-to-expiry signal — ends up existing nowhere. `Amount` is `decimal(18,2)` with a separate ISO-4217 `CurrencyCode`, per the conventions table.
+
+**`Request.Status` is a closed set of three:** `Open`, `Awarded`, `Cancelled`. It changes **only** as a consequence of a quote transition, inside the same transaction — AD-3 sets `Awarded` on acceptance — and never through a status endpoint of its own. `Request` therefore gets no transition table of its own, which is the point: had this been left half-specified while `Quote` received an entire AD and a state diagram, the FR-1 and FR-2 stories would each have invented a different request status enum.
 
 ### Deployment and operational envelope
 
@@ -226,14 +315,14 @@ graph LR
     end
     subgraph Azure["Azure profile — activated purely by connection strings"]
         B2["Browser"] --> A2["App Service running the same host"]
-        A2 --> S2[(Relational store)]
+        A2 --> S2[(Same SQLite file on App Service persistent storage)]
         A2 --> Q2["Service Bus queue"]
-        Q2 --> C2["Consumer as hosted service or Azure Function"]
+        Q2 --> C2["Consumer as hosted service"]
         A2 --> M2["Azure Monitor and Application Insights"]
     end
 ```
 
-The two profiles are the **same build**. Switching is a matter of which connection strings are present, per AD-6. In the default profile the SPA is served as static assets from the API host, so the demo is one process and one URL; Vite's dev server with a proxy is used only during development.
+The two profiles are the **same build**, and the persistence leg is drawn as SQLite in both because that is what AD-6 actually permits — showing a generic relational store on the Azure side would make the same-build claim false in the one place an interviewer is most likely to poke. Switching profiles is a matter of which connection strings are present, per AD-6. In the default profile the SPA is served as static assets from the API host, so the demo is one process and one URL; Vite's dev server with a proxy is used only during development.
 
 ### Source tree
 
@@ -262,21 +351,25 @@ QuoteManager/
 
 | Capability / Area | Lives in | Governed by |
 | --- | --- | --- |
-| FR-1 Manage organisations, requests, quotes | `Application/Features/*`, `Api` endpoints | AD-1, AD-8, AD-9, conventions |
+| FR-1 Manage organisations, requests, quotes | `Application/Features/*`, `Api` endpoints | AD-1, AD-2 (mutability), AD-8, AD-9, conventions |
 | FR-2 Many quotes per request at differing stages | `Domain.Request` aggregate | AD-2, AD-3 |
-| FR-3 Enforced transitions, one accepted quote | `Domain` transition table, EF filtered index | AD-2, AD-3, AD-7, AD-8 |
+| FR-3 Enforced transitions, one accepted quote | `Domain` transition table, EF filtered index | AD-2, AD-3, AD-7, AD-8, AD-15 |
 | FR-4 See what is happening and act on the right work | `Application` read-model projections, dashboard and timeline endpoints | AD-5, AD-7, AD-11 |
 | FR-5 Lightweight auditability | `Infrastructure/Persistence` interceptor, `AuditEntry` | AD-4, AD-5, AD-10 |
 | Messaging and integration events | `Infrastructure/Messaging`, `OutboxDispatcher` | AD-4, AD-6 |
 | Observability and error capture | `Infrastructure/Telemetry`, Serilog, OpenTelemetry | AD-6, AD-8, conventions |
-| Authentication and role-based access | `Api` auth pipeline, `Infrastructure/Identity` | AD-9, AD-10 |
+| Authentication and role-based access | `Api` auth pipeline, `Infrastructure/Identity`, SPA `AuthProvider` and `apiClient` | AD-9, AD-10, AD-13, AD-14 |
+| Fresh-clone run contract, migrations, demo seed | `Infrastructure/Persistence/Migrations`, start-up seeder | AD-16 |
 
 ## Deferred
 
 | Deferred | Why it can wait | Revisit when |
 | --- | --- | --- |
 | Refresh tokens, token revocation, lockout | Access tokens with a short lifetime demonstrate the authorisation model; rotation is orthogonal machinery that would consume build time without changing what is being assessed | The tool holds real user accounts |
-| Multi-tenancy and row-level authorisation | Organisations are reference data here, not tenancy boundaries; retrofitting is a query-filter change, not a re-architecture | A second customer shares the deployment |
+| Org-scoped read filtering (see AD-13, which states the current posture affirmatively rather than leaving it silent) | Every authenticated user reads all data in this build, and the README says so; retrofitting is one EF global query filter, not a re-architecture. Write authorisation is already role-gated by AD-2 | A vendor must not see a competitor's quotes |
+| `HttpOnly` cookie plus CSRF protection for the token | AD-14 chooses `sessionStorage` with the XSS trade-off stated; moving to a cookie changes one module because AD-14 confines token handling to a single `apiClient` | The tool faces untrusted users or holds real data |
+| An expiry sweep `BackgroundService` | `Expire` is a manual action plus a stored `ExpiresAt` that AD-11 projections read, so proximity to expiry is equally visible in the dashboard; the sweeper would add a hosted service and its own transactional and idempotency questions for no change to what is demonstrated | Quotes must expire without anyone looking |
+| Keyset pagination | Offset paging is correct at these volumes and the conventions table pins one request contract, so changing the strategy later touches one shared `PagedQuery` | Result sets grow past a few thousand rows |
 | A second EF provider and SQL Server migration set | Migrations are provider-specific; maintaining two sets is unaffordable inside the timebox, and the provider is isolated behind one registration | The target environment is fixed |
 | Horizontal scale-out of the outbox dispatcher | Single-instance ordered draining is correct and simple; competing consumers need row leasing or `SKIP LOCKED`, which SQLite cannot express | More than one API instance runs |
 | Real notification transport (email, webhook) | The consumer boundary and idempotency are what matter architecturally; the transport behind the port is substitutable | A stakeholder needs to actually be notified |

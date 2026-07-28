@@ -48,6 +48,10 @@
     <PackageVersion Include="NSubstitute" Version="6.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <!-- FakeTimeProvider. The conventions ban DateTime.Now and require every time-derived signal
+         to be deterministic under test, which only holds if there is a controllable clock to test
+         against. Note the package id differs from its namespace (Microsoft.Extensions.Time.Testing). -->
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.8.0" />
   </ItemGroup>
 
   <!-- SECURITY PINS (transitive dependencies we do not reference directly).

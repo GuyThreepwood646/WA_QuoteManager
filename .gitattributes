@@ -1,0 +1,13 @@
+* text=auto eol=lf
+
+*.sln    text eol=crlf
+*.slnx   text eol=crlf
+*.csproj text eol=crlf
+*.props  text eol=crlf
+*.targets text eol=crlf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
