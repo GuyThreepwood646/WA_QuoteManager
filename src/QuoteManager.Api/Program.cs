@@ -1,10 +1,13 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using QuoteManager.Api.Auth;
+using QuoteManager.Api.ErrorHandling;
 using QuoteManager.Api.Observability;
+using QuoteManager.Api.Quotes;
 using QuoteManager.Infrastructure;
 using QuoteManager.Infrastructure.Persistence;
 using Scalar.AspNetCore;
@@ -63,10 +66,18 @@ try
             .RequireAuthenticatedUser()
             .Build());
 
+    // AD-7: actions cross the wire as readable names (e.g. "StartReview"), not the ordinal a
+    // default JSON enum converter would emit, since the UI maps permittedActions to controls by
+    // comparing these strings against QuoteAction.
+    builder.Services.ConfigureHttpJsonOptions(options =>
+        options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
     builder.Services.AddOpenApi();
 
-    // AD-8: every error leaves the process as RFC 9457 problem details. Registering the service
-    // here is what allows the exception handler to produce them for unhandled failures too.
+    // AD-8: every error leaves the process as RFC 9457 problem details. DomainExceptionHandler
+    // maps typed domain violations to their stable code and status first; AddProblemDetails is
+    // what lets it (and the fallback handler for anything unmapped) actually write the response.
+    builder.Services.AddExceptionHandler<DomainExceptionHandler>();
     builder.Services.AddProblemDetails();
 
     builder.Services.AddHealthChecks();
@@ -104,6 +115,7 @@ try
     app.MapHealthChecks("/health").AllowAnonymous();
 
     app.MapAuthEndpoints();
+    app.MapQuoteEndpoints();
 
     // Serves the built React bundle from wwwroot so a Release run is a single process on a single
     // origin — no CORS configuration, no second server to start during a demo. In development the
