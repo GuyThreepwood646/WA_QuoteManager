@@ -251,11 +251,15 @@ Verified against the NuGet flat-container API and the npm registry on 2026-07-28
 | TypeScript | 6.0.3 |
 | Vite | 8.1.5 |
 | @vitejs/plugin-react | 6.0.4 |
-| Mantine (core, hooks, form, dates) | 9.5.0 |
-| dayjs (peer dependency of `@mantine/dates`) | 1.11.21 |
+| Tailwind CSS + `@tailwindcss/vite` | 4.3.3 |
+| shadcn/ui (`new-york` style, `radix-ui` unified package, CLI-vendored source under `src/components/ui`) | 4.16.0 (CLI) |
+| dayjs | 1.11.21 |
 | TanStack Query | 5.101.4 |
 | `react-router` (v7-consolidated package, not `react-router-dom`) | 7.18.1 |
 | oxlint | 1.76.0 |
+| Playwright (`@playwright/test`) | 1.62.0 |
+
+**UI library superseded mid-build:** Mantine 9.5.0 was the original pick and shipped as far as a login page and app shell placeholder. The user redirected before the dashboard was built, asking for shadcn/ui specifically and a dark, soft, modern aesthetic — a deliberate visual-identity call that overrides the earlier "boring technology" default. Mantine, its PostCSS pipeline (`postcss-preset-mantine`, `postcss-simple-vars`), and `theme.ts` were removed outright rather than left dormant. The dark palette lives as OKLCH CSS custom properties in `src/index.css` (`:root` / `.dark`, mapped through `@theme inline` per Tailwind v4's CSS-first config) — background/card/popover/accent step up in lightness rather than leaning on borders, with a single saturated primary against near-neutral, cool-tinted greys. The primary shipped first as an indigo/violet, then moved to a clean azure/cobalt blue after user feedback that purple wasn't wanted — blue was chosen over orange because the background's own faint cool tint keeps it harmonious rather than a complementary clash, with the pop coming from the lightness jump rather than a hue clash. `<html class="dark">` is hard-coded in `index.html`: this build ships one theme, not a light/dark toggle, though the token split leaves that door open.
 
 **Node floor.** The toolchain floor is Node 20.19 / 22.12, set by Vite 8. `react-router` is deliberately held at 7.18.1 rather than 8.x because 8.x declares `engines.node >= 22.22.0`, which fails `npm install --engine-strict` and every engine-enforcing CI image on anything older — including the local 22.18.0. Raising the repository's Node floor by a patch-level accident of one routing library, in a deliverable whose entire premise is that a reviewer can clone and run it, is a bad trade. The v7 package exports the same `BrowserRouter` / `Routes` / `Route` / `NavLink` surface this app uses, so the constraint costs nothing.
 

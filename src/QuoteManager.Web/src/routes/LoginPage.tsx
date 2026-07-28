@@ -1,10 +1,13 @@
-import { Alert, Button, Paper, PasswordInput, Stack, TextInput, Title } from '@mantine/core'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
 import { ApiError } from '../api/apiClient'
 import { useAuth } from '../auth/AuthProvider'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 export function LoginPage() {
   const { login } = useAuth()
@@ -33,38 +36,58 @@ export function LoginPage() {
   }
 
   return (
-    <Stack align="center" justify="center" mih="100vh" bg="gray.0">
-      <Paper withBorder shadow="sm" p="xl" w={360}>
-        <Stack gap="md">
-          <Title order={3}>Quote Manager</Title>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
+      {/* A soft, low-opacity glow behind the card is the one decorative flourish on this page -
+          enough to keep a plain dark background from feeling inert, without competing with the form. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute top-1/2 left-1/2 size-[36rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/15 blur-[120px]"
+      />
+
+      <Card className="relative w-full max-w-sm border-border/60 shadow-2xl shadow-black/40">
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-xl">Quote Manager</CardTitle>
+          <CardDescription>Sign in to review requests and quotes.</CardDescription>
+        </CardHeader>
+        <CardContent>
           {error && (
-            <Alert color="red" title="Sign in failed">
+            <div
+              role="alert"
+              className="mb-4 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            >
               {error}
-            </Alert>
+            </div>
           )}
-          <form onSubmit={handleSubmit}>
-            <Stack gap="sm">
-              <TextInput
-                label="Email"
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
                 type="email"
+                autoComplete="email"
                 value={email}
                 onChange={(event) => setEmail(event.currentTarget.value)}
                 required
                 autoFocus
               />
-              <PasswordInput
-                label="Password"
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.currentTarget.value)}
                 required
               />
-              <Button type="submit" loading={submitting} fullWidth mt="xs">
-                Sign in
-              </Button>
-            </Stack>
+            </div>
+            <Button type="submit" disabled={submitting} className="mt-2">
+              {submitting ? 'Signing in…' : 'Sign in'}
+            </Button>
           </form>
-        </Stack>
-      </Paper>
-    </Stack>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

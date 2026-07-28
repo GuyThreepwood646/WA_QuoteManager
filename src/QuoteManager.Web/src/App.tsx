@@ -1,6 +1,10 @@
-import { AppShell, Button, Group, NavLink, Text, Title } from '@mantine/core'
+import { Building2, FileText, LayoutDashboard, LogOut } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { NavLink as RouterNavLink, Navigate, Route, Routes, useLocation } from 'react-router'
+
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
 
 import { useAuth } from './auth/AuthProvider'
 import { LoginPage } from './routes/LoginPage'
@@ -13,7 +17,14 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/*" element={<RequireAuth><Shell /></RequireAuth>} />
+      <Route
+        path="/*"
+        element={
+          <RequireAuth>
+            <Shell />
+          </RequireAuth>
+        }
+      />
     </Routes>
   )
 }
@@ -29,6 +40,12 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return children
 }
 
+const navItems = [
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/requests', label: 'Requests', icon: FileText },
+  { to: '/organizations', label: 'Organizations', icon: Building2 },
+]
+
 /**
  * The dashboard is the root route deliberately. The brief's real requirement is that a user can see
  * what is happening and focus on the right work, so the landing surface is a triage view rather than
@@ -38,39 +55,58 @@ function Shell() {
   const { session, logout } = useAuth()
 
   return (
-    <AppShell header={{ height: 56 }} navbar={{ width: 220, breakpoint: 'sm' }} padding="md">
-      <AppShell.Header>
-        <Group h="100%" px="md" justify="space-between">
-          <Title order={4}>Quote Manager</Title>
-          <Group gap="sm">
-            <Text size="sm" c="dimmed">
-              {session?.user.displayName}
-            </Text>
-            <Button variant="subtle" size="xs" onClick={logout}>
+    <div className="flex h-screen bg-background text-foreground">
+      <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground">
+        <div className="flex h-14 items-center px-5">
+          <span className="text-sm font-semibold tracking-tight">Quote Manager</span>
+        </div>
+        <Separator className="bg-sidebar-border" />
+        <nav className="flex flex-1 flex-col gap-1 p-3">
+          {navItems.map(({ to, label, icon: Icon }) => (
+            <RouterNavLink
+              key={to}
+              to={to}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
+                )
+              }
+            >
+              <Icon className="size-4" />
+              {label}
+            </RouterNavLink>
+          ))}
+        </nav>
+      </aside>
+
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
+          <span className="text-sm text-muted-foreground">Service requests and quotes</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium">{session?.user.displayName}</span>
+            <Button variant="ghost" size="sm" onClick={logout}>
+              <LogOut className="size-4" />
               Sign out
             </Button>
-          </Group>
-        </Group>
-      </AppShell.Header>
+          </div>
+        </header>
 
-      <AppShell.Navbar p="xs">
-        <NavLink component={RouterNavLink} to="/dashboard" label="Dashboard" />
-        <NavLink component={RouterNavLink} to="/requests" label="Requests" />
-        <NavLink component={RouterNavLink} to="/organizations" label="Organizations" />
-      </AppShell.Navbar>
-
-      <AppShell.Main>
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Placeholder name="Dashboard" />} />
-          <Route path="/requests" element={<Placeholder name="Requests" />} />
-          <Route path="/organizations" element={<Placeholder name="Organizations" />} />
-        </Routes>
-      </AppShell.Main>
-    </AppShell>
+        <main className="flex-1 overflow-y-auto p-6">
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Placeholder name="Dashboard" />} />
+            <Route path="/requests" element={<Placeholder name="Requests" />} />
+            <Route path="/organizations" element={<Placeholder name="Organizations" />} />
+          </Routes>
+        </main>
+      </div>
+    </div>
   )
 }
 
 function Placeholder({ name }: { name: string }) {
-  return <Text c="dimmed">{name} — not implemented yet.</Text>
+  return <p className="text-sm text-muted-foreground">{name} — not implemented yet.</p>
 }
