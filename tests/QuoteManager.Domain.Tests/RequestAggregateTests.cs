@@ -52,8 +52,8 @@ public sealed class RequestAggregateTests
         contender.Status.ShouldBe(QuoteStatus.Rejected);
         contender.StatusReason.ShouldBe("SupersededByAcceptedQuote");
 
-        // A draft was never in contention, so superseding it would misrepresent what happened.
-        draft.Status.ShouldBe(QuoteStatus.Draft);
+        draft.Status.ShouldBe(QuoteStatus.Rejected);
+        draft.StatusReason.ShouldBe("SupersededByAcceptedQuote");
     }
 
     [Fact]
@@ -65,12 +65,12 @@ public sealed class RequestAggregateTests
 
         request.ApplyQuoteAction(first.Id, QuoteAction.Accept, Reviewer, Now);
 
-        // The sibling was auto-rejected, so reaching Accept again requires an admin to revive it;
-        // the invariant must hold even then.
+        // The sibling was auto-rejected and the request was awarded, so a second Accept is blocked
+        // at the request level before any quote transition runs.
         var exception = Should.Throw<DomainException>(() =>
             request.ApplyQuoteAction(second.Id, QuoteAction.Accept, Admin, Now));
 
-        exception.Code.ShouldBeOneOf("quote.already_accepted", "quote.transition_not_allowed");
+        exception.Code.ShouldBe("request.not_editable");
         request.Quotes.Count(q => q.Status == QuoteStatus.Accepted).ShouldBe(1);
     }
 
@@ -167,6 +167,23 @@ public sealed class RequestAggregateTests
 
         quote.Amount.Amount.ShouldBe(950.00m, "money is rounded to two places on the way in");
         quote.Notes.ShouldBe("Sharpened pencil");
+    }
+
+    [Fact]
+    public void A_withdrawn_quote_can_be_revised_back_to_draft()
+    {
+        var request = NewRequest();
+        var quote = request.AddQuote(VendorOrgA, new Money(1000m, "USD"), null, null, Vendor, Now);
+        request.ApplyQuoteAction(quote.Id, QuoteAction.Withdraw, Vendor, Now);
+        quote.Status.ShouldBe(QuoteStatus.Withdrawn);
+
+        request.EditQuote(quote.Id, new Money(875m, "USD"), null, "Revised offer", Vendor, Now);
+
+        quote.Status.ShouldBe(QuoteStatus.Draft);
+        quote.StatusReason.ShouldBeNull();
+        quote.Amount.Amount.ShouldBe(875m);
+        quote.Notes.ShouldBe("Revised offer");
+        request.DomainEvents.ShouldContain(e => e.Action == "QuoteDraft");
     }
 
     [Fact]

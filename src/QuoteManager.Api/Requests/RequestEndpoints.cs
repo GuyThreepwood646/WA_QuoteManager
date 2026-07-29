@@ -263,9 +263,8 @@ public static class RequestEndpoints
             .Where(o => organizationIds.Contains(o.Id))
             .ToDictionaryAsync(o => o.Id, o => o.Name, cancellationToken);
 
-        // HasQuoted is computed against every quote, not just the visible ones - it is a boolean
-        // the viewer is entitled to know about their own invitation regardless of who else quoted.
-        var quotedVendorIds = request.Quotes.Select(q => q.VendorOrganizationId).ToHashSet();
+        // HasQuoted ignores inactive quotes (Withdrawn/Expired/Rejected) — those vendors may revise or draft anew.
+        var quotedVendorIds = VendorsWithActiveQuotes(request.Quotes);
 
         var canActOnRequest = actor.Roles.HasAny(AppRole.Requester | AppRole.Admin);
 
@@ -279,7 +278,7 @@ public static class RequestEndpoints
             request.NeededBy,
             request.CreatedAt,
             request.IsEditable,
-            ComputeCanAddQuote(request.IsEditable, actor, quotedVendorIds),
+            ComputeCanAddQuote(request.Status == RequestStatus.Open, actor, quotedVendorIds),
             request.IsEditable && canActOnRequest,
             request.Status == RequestStatus.Open && canActOnRequest,
             request.Status == RequestStatus.Open && canActOnRequest,
@@ -295,9 +294,11 @@ public static class RequestEndpoints
                 quote.StatusChangedAt,
                 quote.StatusReason,
                 quote.Version,
-                QuoteTransitions.PermittedFor(quote.Status, actor, quote.VendorOrganizationId)
-                    .Select(a => a.ToString())
-                    .ToList()))
+                request.Status == RequestStatus.Open
+                    ? QuoteTransitions.PermittedFor(quote.Status, actor, quote.VendorOrganizationId)
+                        .Select(a => a.ToString())
+                        .ToList()
+                    : []))
                 .ToList(),
             visibleInvitations.Select(invitation => new RequestInvitationItem(
                 invitation.VendorOrganizationId,
@@ -307,9 +308,29 @@ public static class RequestEndpoints
                 .ToList());
     }
 
-    private static bool ComputeCanAddQuote(bool isEditable, DomainActor actor, HashSet<Guid> quotedVendorOrgIds) =>
-        isEditable
-        && actor.Roles.HasAny(AppRole.Vendor)
-        && actor.OrganizationId is { } organizationId
-        && !quotedVendorOrgIds.Contains(organizationId);
+    private static HashSet<Guid> VendorsWithActiveQuotes(IEnumerable<Quote> quotes) =>
+        quotes.Where(q => !QuoteTransitions.IsInactive(q.Status))
+            .Select(q => q.VendorOrganizationId)
+            .ToHashSet();
+
+    /// <summary>
+    /// Vendor self-serve: own org, and only if it has not quoted yet. Admin: any open request —
+    /// they pick the vendor on the form, matching <c>Request.AddQuote</c>.
+    /// </summary>
+    private static bool ComputeCanAddQuote(bool isOpen, DomainActor actor, HashSet<Guid> quotedVendorOrgIds)
+    {
+        if (!isOpen)
+        {
+            return false;
+        }
+
+        if (actor.Roles.HasAny(AppRole.Admin))
+        {
+            return true;
+        }
+
+        return actor.Roles.HasAny(AppRole.Vendor)
+            && actor.OrganizationId is { } organizationId
+            && !quotedVendorOrgIds.Contains(organizationId);
+    }
 }

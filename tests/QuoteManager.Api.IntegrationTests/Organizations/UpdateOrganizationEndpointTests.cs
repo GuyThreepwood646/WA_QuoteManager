@@ -11,8 +11,8 @@ using QuoteManager.Infrastructure.Persistence;
 namespace QuoteManager.Api.IntegrationTests.Organizations;
 
 /// <summary>
-/// Exercises <c>PUT /api/organizations/{organizationId}</c>, which renames an organization -
-/// the only mutable business field the domain models (<c>Kind</c> is immutable).
+/// Exercises <c>PUT /api/organizations/{organizationId}</c>, which updates an organization's
+/// profile (name, contact fields, preferred-vendor flag, and locations). <c>Kind</c> is immutable.
 /// </summary>
 public sealed class UpdateOrganizationEndpointTests : IDisposable
 {
@@ -35,6 +35,64 @@ public sealed class UpdateOrganizationEndpointTests : IDisposable
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<OrganizationListItem>(ct);
         body!.Name.ShouldBe("Interstate Freight & Logistics");
+    }
+
+    [Fact]
+    public async Task An_admin_can_update_an_organization_profile_including_locations_with_phone()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var client = await LoginAsAsync("admin@warehouseanywhere.test");
+
+        var uniqueName = $"Profile Update Target {Guid.NewGuid():N}";
+        var create = await client.PostAsJsonAsync(
+            "/api/organizations",
+            new { name = uniqueName, kind = "Vendor" },
+            ct);
+        create.EnsureSuccessStatusCode();
+        var created = await create.Content.ReadFromJsonAsync<OrganizationListItem>(ct);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/organizations/{created!.Id}",
+            new
+            {
+                name = uniqueName,
+                primaryAddress = "55 Crate Lane, Greensboro, NC 27409",
+                primaryContactName = "Kim Olsen",
+                primaryContactEmail = "kim.update@crateworks.test",
+                primaryContactPhone = "+1 (336) 555-0163",
+                isPreferredVendor = false,
+                locations = new[]
+                {
+                    new { address = "18 Packing Court, Columbia, SC 29201", phone = "+1 (803) 555-0127" },
+                    new { address = "9 Warehouse Row, Raleigh, NC 27603", phone = "+1 (919) 555-0199" },
+                },
+            },
+            ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<OrganizationListItem>(ct);
+
+        body!.PrimaryContactEmail.ShouldBe("kim.update@crateworks.test");
+        body.Locations.Count.ShouldBe(2);
+        body.Locations.ShouldContain(l => l.Address.Contains("Raleigh") && l.Phone == "+1 (919) 555-0199");
+    }
+
+    [Fact]
+    public async Task Marking_a_client_as_preferred_on_update_is_rejected_as_a_validation_problem()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var client = await LoginAsAsync("admin@warehouseanywhere.test");
+        var organizationId = await FindOrganizationIdAsync("Meridian Pharma Sampling", ct);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/organizations/{organizationId}",
+            new { name = "Meridian Pharma Sampling", isPreferredVendor = true },
+            ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemBody>(ct);
+        problem.ShouldNotBeNull();
+        problem.Errors.ShouldContainKey("IsPreferredVendor");
     }
 
     [Fact]
@@ -109,4 +167,6 @@ public sealed class UpdateOrganizationEndpointTests : IDisposable
     }
 
     private sealed record ProblemCode(string Code);
+
+    private sealed record ValidationProblemBody(Dictionary<string, string[]> Errors);
 }

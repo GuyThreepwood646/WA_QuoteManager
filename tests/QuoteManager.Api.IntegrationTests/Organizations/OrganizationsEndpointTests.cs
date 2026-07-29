@@ -39,6 +39,28 @@ public sealed class OrganizationsEndpointTests : IDisposable
     }
 
     [Fact]
+    public async Task Listing_organizations_returns_seeded_profile_fields_and_location_phones()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var client = await LoginAsAsync("admin@warehouseanywhere.test");
+
+        var response = await client.GetAsync("/api/organizations?pageSize=100", ct);
+        response.EnsureSuccessStatusCode();
+        var page = await response.Content.ReadFromJsonAsync<PagedResult<OrganizationListItem>>(ct);
+
+        var secureBase = page!.Items.Single(o => o.Name == "SecureBase Self Storage");
+        secureBase.PrimaryContactName.ShouldBe("Alex Rivera");
+        secureBase.PrimaryContactEmail.ShouldBe("alex.rivera@securebase.test");
+        secureBase.IsPreferredVendor.ShouldBeTrue();
+        secureBase.Locations.ShouldContain(l =>
+            l.Address == "910 Logistics Way, Raleigh, NC 27603" && l.Phone == "+1 (919) 555-0148");
+
+        var meridian = page.Items.Single(o => o.Name == "Meridian Pharma Sampling");
+        meridian.IsPreferredVendor.ShouldBeFalse();
+        meridian.Locations.Count.ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
     public async Task Requesting_a_page_size_over_the_cap_is_clamped_rather_than_rejected()
     {
         var ct = TestContext.Current.CancellationToken;

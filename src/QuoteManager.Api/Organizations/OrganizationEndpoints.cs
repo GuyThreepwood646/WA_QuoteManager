@@ -7,7 +7,19 @@ using QuoteManager.Infrastructure.Persistence;
 
 namespace QuoteManager.Api.Organizations;
 
-public sealed record OrganizationListItem(Guid Id, string Name, string Kind, DateTimeOffset? RetiredAt);
+public sealed record OrganizationLocationItem(Guid Id, string Address, string? Phone, int SortOrder);
+
+public sealed record OrganizationListItem(
+    Guid Id,
+    string Name,
+    string Kind,
+    DateTimeOffset? RetiredAt,
+    string? PrimaryAddress,
+    string? PrimaryContactName,
+    string? PrimaryContactEmail,
+    string? PrimaryContactPhone,
+    bool IsPreferredVendor,
+    IReadOnlyList<OrganizationLocationItem> Locations);
 
 public static class OrganizationEndpoints
 {
@@ -26,16 +38,14 @@ public static class OrganizationEndpoints
         bool includeRetired = false)
     {
         var baseQuery = db.Organizations.AsNoTracking()
+            .Include(o => o.Locations)
             .Where(o => includeRetired || o.RetiredAt == null)
-            .OrderBy(o => o.Name)
-            .Select(o => new { o.Id, o.Name, o.Kind, o.RetiredAt });
+            .OrderBy(o => o.Name);
 
         var total = await baseQuery.CountAsync(cancellationToken);
         var rows = await baseQuery.Skip(query.Skip).Take(query.ResolvedPageSize).ToListAsync(cancellationToken);
 
-        var items = rows
-            .Select(row => new OrganizationListItem(row.Id, row.Name, row.Kind.ToString(), row.RetiredAt))
-            .ToList();
+        var items = rows.Select(ToListItem).ToList();
 
         return new PagedResult<OrganizationListItem>(items, query.ResolvedPage, query.ResolvedPageSize, total);
     }
@@ -55,22 +65,29 @@ public static class OrganizationEndpoints
         }
 
         var organization = Organization.Create(trimmedName, body.Kind, currentUser.ToActor(), timeProvider.GetUtcNow());
+        organization.UpdateProfile(
+            trimmedName,
+            body.PrimaryAddress,
+            body.PrimaryContactName,
+            body.PrimaryContactEmail,
+            body.PrimaryContactPhone,
+            body.IsPreferredVendor,
+            ToLocationInputs(body.Locations),
+            currentUser.ToActor(),
+            timeProvider.GetUtcNow());
+
         db.Organizations.Add(organization);
 
         try
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (IsDuplicateOrganizationName(ex))
         {
-            // Backstop for a race between two requests that both passed the AnyAsync check above -
-            // the unique index is the actual guarantee, this pre-check is only the friendly path.
             return DuplicateNameProblem();
         }
 
-        return Results.Created(
-            $"/api/organizations/{organization.Id}",
-            new OrganizationListItem(organization.Id, organization.Name, organization.Kind.ToString(), organization.RetiredAt));
+        return Results.Created($"/api/organizations/{organization.Id}", ToListItem(organization));
     }
 
     private static async Task<IResult> UpdateOrganizationAsync(
@@ -81,7 +98,9 @@ public static class OrganizationEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var organization = await db.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId, cancellationToken);
+        var organization = await db.Organizations
+            .Include(o => o.Locations)
+            .FirstOrDefaultAsync(o => o.Id == organizationId, cancellationToken);
         if (organization is null)
         {
             return Results.NotFound();
@@ -95,19 +114,37 @@ public static class OrganizationEndpoints
             return DuplicateNameProblem();
         }
 
-        organization.Rename(trimmedName, currentUser.ToActor(), timeProvider.GetUtcNow());
+        if (body.IsPreferredVendor && organization.Kind != OrganizationKind.Vendor)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                [nameof(body.IsPreferredVendor)] = ["Only vendor organizations can be marked as preferred."],
+            });
+        }
+
+        organization.UpdateProfile(
+            trimmedName,
+            body.PrimaryAddress,
+            body.PrimaryContactName,
+            body.PrimaryContactEmail,
+            body.PrimaryContactPhone,
+            body.IsPreferredVendor,
+            ToLocationInputs(body.Locations),
+            currentUser.ToActor(),
+            timeProvider.GetUtcNow());
+
+        await db.EnsureNewLocationsAreAddedAsync(organization, cancellationToken);
 
         try
         {
             await db.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException)
+        catch (DbUpdateException ex) when (IsDuplicateOrganizationName(ex))
         {
             return DuplicateNameProblem();
         }
 
-        return Results.Ok(
-            new OrganizationListItem(organization.Id, organization.Name, organization.Kind.ToString(), organization.RetiredAt));
+        return Results.Ok(ToListItem(organization));
     }
 
     private static async Task<IResult> RetireOrganizationAsync(
@@ -117,7 +154,9 @@ public static class OrganizationEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var organization = await db.Organizations.FirstOrDefaultAsync(o => o.Id == organizationId, cancellationToken);
+        var organization = await db.Organizations
+            .Include(o => o.Locations)
+            .FirstOrDefaultAsync(o => o.Id == organizationId, cancellationToken);
         if (organization is null)
         {
             return Results.NotFound();
@@ -126,8 +165,33 @@ public static class OrganizationEndpoints
         organization.Retire(currentUser.ToActor(), timeProvider.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
 
-        return Results.Ok(
-            new OrganizationListItem(organization.Id, organization.Name, organization.Kind.ToString(), organization.RetiredAt));
+        return Results.Ok(ToListItem(organization));
+    }
+
+    private static OrganizationListItem ToListItem(Organization organization) =>
+        new(
+            organization.Id,
+            organization.Name,
+            organization.Kind.ToString(),
+            organization.RetiredAt,
+            organization.PrimaryAddress,
+            organization.PrimaryContactName,
+            organization.PrimaryContactEmail,
+            organization.PrimaryContactPhone,
+            organization.IsPreferredVendor,
+            organization.Locations
+                .OrderBy(l => l.SortOrder)
+                .Select(l => new OrganizationLocationItem(l.Id, l.Address, l.Phone, l.SortOrder))
+                .ToList());
+
+    private static IEnumerable<OrganizationLocationInput> ToLocationInputs(IEnumerable<OrganizationLocationRequest> locations) =>
+        locations.Select(location => new OrganizationLocationInput(location.Address, location.Phone));
+
+    private static bool IsDuplicateOrganizationName(DbUpdateException exception)
+    {
+        var message = exception.InnerException?.Message ?? exception.Message;
+        return message.Contains("UNIQUE constraint failed", StringComparison.OrdinalIgnoreCase)
+            && message.Contains("Organizations", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IResult DuplicateNameProblem() => Results.Problem(

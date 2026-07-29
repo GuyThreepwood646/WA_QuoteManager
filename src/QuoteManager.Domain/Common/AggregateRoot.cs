@@ -31,4 +31,10 @@ public abstract class AggregateRoot
     }
 
     public void ClearDomainEvents() => _domainEvents.Clear();
+
+    /// <summary>
+    /// Bumps <see cref="Version"/> for mutations that do not raise a domain event, so EF's
+    /// concurrency token stays aligned with every state change.
+    /// </summary>
+    protected void MarkModified() => Version++;
 }

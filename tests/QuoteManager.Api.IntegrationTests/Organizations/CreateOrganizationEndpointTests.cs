@@ -36,6 +36,61 @@ public sealed class CreateOrganizationEndpointTests : IDisposable
         body.Name.ShouldBe("New Freight Co");
         body.Kind.ShouldBe("Vendor");
         body.RetiredAt.ShouldBeNull();
+        body.PrimaryAddress.ShouldBeNull();
+        body.Locations.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task An_admin_can_create_an_organization_with_a_full_profile()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var client = await LoginAsAsync("admin@warehouseanywhere.test");
+
+        var response = await client.PostAsJsonAsync(
+            "/api/organizations",
+            new
+            {
+                name = "Coastal Storage Partners",
+                kind = "Vendor",
+                primaryAddress = "12 Harbor Road, Wilmington, NC 28401",
+                primaryContactName = "Sam Ortiz",
+                primaryContactEmail = "sam@coastal.test",
+                primaryContactPhone = "+1 (910) 555-0111",
+                isPreferredVendor = true,
+                locations = new[]
+                {
+                    new { address = "44 Dock Street, Charleston, SC 29401", phone = "+1 (843) 555-0122" },
+                },
+            },
+            ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<OrganizationListItem>(ct);
+
+        body.ShouldNotBeNull();
+        body.Name.ShouldBe("Coastal Storage Partners");
+        body.PrimaryContactName.ShouldBe("Sam Ortiz");
+        body.IsPreferredVendor.ShouldBeTrue();
+        body.Locations.Count.ShouldBe(1);
+        body.Locations[0].Address.ShouldBe("44 Dock Street, Charleston, SC 29401");
+        body.Locations[0].Phone.ShouldBe("+1 (843) 555-0122");
+    }
+
+    [Fact]
+    public async Task Marking_a_client_as_preferred_is_rejected_as_a_validation_problem()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var client = await LoginAsAsync("admin@warehouseanywhere.test");
+
+        var response = await client.PostAsJsonAsync(
+            "/api/organizations",
+            new { name = "Bad Preferred Client", kind = "Client", isPreferredVendor = true },
+            ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemBody>(ct);
+        problem.ShouldNotBeNull();
+        problem.Errors.ShouldContainKey("IsPreferredVendor");
     }
 
     [Theory]

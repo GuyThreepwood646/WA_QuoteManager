@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using QuoteManager.Api.Auth;
 using QuoteManager.Api.IntegrationTests.Auth;
 using QuoteManager.Api.Quotes;
+using QuoteManager.Api.Requests;
 using QuoteManager.Infrastructure.Persistence;
 
 namespace QuoteManager.Api.IntegrationTests.Quotes;
@@ -70,6 +71,37 @@ public sealed class QuoteTransitionTests : IDisposable
         response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
         var code = await ReadProblemCodeAsync(response);
         code.ShouldBe("quote.transition_not_allowed");
+    }
+
+    [Fact]
+    public async Task Accepting_a_quote_rejects_competing_quotes_and_leaves_them_read_only_on_the_request_detail()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (requestId, winnerQuoteId) = await FindQuoteAsync(
+            "Regional sample storage — Southeast territory", "vendor@warehouseanywhere.test");
+        var client = await LoginAsAsync("reviewer@warehouseanywhere.test");
+
+        var winner = await GetQuoteAsync(client, requestId, winnerQuoteId);
+        winner.Status.ShouldBe("UnderReview");
+
+        var accept = await SendActionAsync(client, requestId, winnerQuoteId, "Accept", winner.Version);
+        accept.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var detail = await client.GetFromJsonAsync<RequestDetailResponse>($"/api/requests/{requestId}", ct);
+        detail.ShouldNotBeNull();
+        detail.Status.ShouldBe("Awarded");
+        detail.CanAddQuote.ShouldBeFalse();
+        detail.CanEdit.ShouldBeFalse();
+        detail.CanCancel.ShouldBeFalse();
+
+        var accepted = detail.Quotes.Single(q => q.Id == winnerQuoteId);
+        accepted.Status.ShouldBe("Accepted");
+        accepted.PermittedActions.ShouldBeEmpty();
+
+        var rejected = detail.Quotes.Single(q => q.VendorOrganizationName == "Crateworks Packing & Crating");
+        rejected.Status.ShouldBe("Rejected");
+        rejected.StatusReason.ShouldBe("SupersededByAcceptedQuote");
+        rejected.PermittedActions.ShouldBeEmpty();
     }
 
     [Fact]

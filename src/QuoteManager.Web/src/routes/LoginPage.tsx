@@ -4,10 +4,17 @@ import { useLocation, useNavigate } from 'react-router'
 
 import { ApiError } from '../api/apiClient'
 import { useAuth } from '../auth/AuthProvider'
+import { FormField } from '@/components/form-field'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import {
+  type FieldErrors,
+  clearFieldError,
+  hasFieldErrors,
+  validateEmail,
+  validateRequired,
+} from '@/lib/form-validation'
 
 export function LoginPage() {
   const { login } = useAuth()
@@ -16,13 +23,37 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [submitting, setSubmitting] = useState(false)
 
   const redirectTo = (location.state as { from?: string } | null)?.from ?? '/'
 
+  function validateForm(): FieldErrors {
+    const next: FieldErrors = {}
+
+    const emailError = validateEmail(email)
+    if (emailError) {
+      next.email = emailError
+    }
+
+    const passwordError = validateRequired(password, 'Password')
+    if (passwordError) {
+      next.password = passwordError
+    }
+
+    return next
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
+
+    const next = validateForm()
+    setFieldErrors(next)
+    if (hasFieldErrors(next)) {
+      return
+    }
+
     setSubmitting(true)
 
     try {
@@ -58,30 +89,30 @@ export function LoginPage() {
               {error}
             </div>
           )}
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Email</Label>
+          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+            <FormField id="email" label="Email" error={fieldErrors.email}>
               <Input
-                id="email"
                 type="email"
                 autoComplete="email"
                 value={email}
-                onChange={(event) => setEmail(event.currentTarget.value)}
-                required
+                onChange={(event) => {
+                  setEmail(event.currentTarget.value)
+                  setFieldErrors((current) => clearFieldError(current, 'email'))
+                }}
                 autoFocus
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="password">Password</Label>
+            </FormField>
+            <FormField id="password" label="Password" error={fieldErrors.password}>
               <Input
-                id="password"
                 type="password"
                 autoComplete="current-password"
                 value={password}
-                onChange={(event) => setPassword(event.currentTarget.value)}
-                required
+                onChange={(event) => {
+                  setPassword(event.currentTarget.value)
+                  setFieldErrors((current) => clearFieldError(current, 'password'))
+                }}
               />
-            </div>
+            </FormField>
             <Button type="submit" disabled={submitting} className="mt-2">
               {submitting ? 'Signing in…' : 'Sign in'}
             </Button>

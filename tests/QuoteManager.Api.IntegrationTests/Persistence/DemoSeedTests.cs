@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Time.Testing;
 using QuoteManager.Domain.Identity;
+using QuoteManager.Domain.Organizations;
 using QuoteManager.Domain.Quotes;
 using QuoteManager.Domain.Requests;
 using QuoteManager.Infrastructure.Identity;
@@ -146,6 +147,28 @@ public sealed class DemoSeedTests : IAsyncLifetime
         // The case the invitation list exists for: silence that would otherwise be invisible.
         requests.ShouldContain(r => r.Invitations.Count > 0 && r.Quotes.Count == 0);
         requests.ShouldContain(r => r.AwaitingResponseFrom.Count > 0 && r.Quotes.Count > 0);
+    }
+
+    [Fact]
+    public async Task Seeded_organizations_include_profile_data_and_location_phones()
+    {
+        var secureBase = await _context.Organizations.AsNoTracking()
+            .Include(o => o.Locations)
+            .SingleAsync(o => o.Name == "SecureBase Self Storage", TestContext.Current.CancellationToken);
+
+        secureBase.PrimaryContactName.ShouldBe("Alex Rivera");
+        secureBase.PrimaryContactPhone.ShouldBe("+1 (704) 555-0198");
+        secureBase.IsPreferredVendor.ShouldBeTrue();
+        secureBase.Locations.ShouldContain(l =>
+            l.Address == "910 Logistics Way, Raleigh, NC 27603" && l.Phone == "+1 (919) 555-0148");
+
+        var meridian = await _context.Organizations.AsNoTracking()
+            .Include(o => o.Locations)
+            .SingleAsync(o => o.Name == "Meridian Pharma Sampling", TestContext.Current.CancellationToken);
+
+        meridian.Kind.ShouldBe(OrganizationKind.Client);
+        meridian.IsPreferredVendor.ShouldBeFalse();
+        meridian.Locations.Count.ShouldBeGreaterThan(0);
     }
 
     [Fact]

@@ -39,9 +39,17 @@ public sealed class QuoteTransitionTableTests
 
     [Theory]
     [MemberData(nameof(TerminalStates))]
-    public void Terminal_states_offer_no_actions_to_anyone(QuoteStatus status)
+    public void Terminal_states_offer_no_lifecycle_actions_except_revise_on_inactive_quotes(QuoteStatus status)
     {
         QuoteTransitions.IsTerminal(status).ShouldBeTrue();
+
+        if (QuoteTransitions.IsInactive(status))
+        {
+            QuoteTransitions.PermittedFor(status, Vendor, OwnOrg).ShouldBe([QuoteAction.Edit]);
+            QuoteTransitions.PermittedFor(status, Admin, OwnOrg).ShouldBe([QuoteAction.Edit]);
+            return;
+        }
+
         QuoteTransitions.PermittedFor(status, AllRoles, OwnOrg).ShouldBeEmpty();
     }
 
@@ -151,11 +159,13 @@ public sealed class QuoteTransitionTableTests
     }
 
     [Fact]
-    public void Only_Draft_is_editable()
+    public void Draft_Withdrawn_Expired_and_Rejected_quotes_are_editable()
     {
         var editable = Enum.GetValues<QuoteStatus>().Where(QuoteTransitions.IsEditable).ToArray();
 
-        editable.ShouldBe([QuoteStatus.Draft]);
+        editable.ShouldBe(
+            [QuoteStatus.Draft, QuoteStatus.Withdrawn, QuoteStatus.Expired, QuoteStatus.Rejected],
+            ignoreOrder: true);
     }
 
     [Fact]
@@ -163,6 +173,9 @@ public sealed class QuoteTransitionTableTests
     {
         QuoteTransitions.PermittedFor(QuoteStatus.Draft, Vendor, OwnOrg).ShouldContain(QuoteAction.Edit);
         QuoteTransitions.PermittedFor(QuoteStatus.Submitted, Vendor, OwnOrg).ShouldNotContain(QuoteAction.Edit);
+        QuoteTransitions.PermittedFor(QuoteStatus.Withdrawn, Vendor, OwnOrg).ShouldContain(QuoteAction.Edit);
+        QuoteTransitions.PermittedFor(QuoteStatus.Rejected, Vendor, OwnOrg).ShouldContain(QuoteAction.Edit);
+        QuoteTransitions.PermittedFor(QuoteStatus.Expired, Vendor, OwnOrg).ShouldContain(QuoteAction.Edit);
     }
 
     [Fact]

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using QuoteManager.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using QuoteManager.Infrastructure.Persistence;
 namespace QuoteManager.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(QuoteManagerDbContext))]
-    partial class QuoteManagerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260729210239_AddOrganizationProfileFields")]
+    partial class AddOrganizationProfileFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
@@ -86,10 +89,6 @@ namespace QuoteManager.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("OrganizationId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Phone")
-                        .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("SortOrder")

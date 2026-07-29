@@ -37,6 +37,10 @@ public static class QuoteTransitions
         new(QuoteStatus.UnderReview, QuoteAction.Reject, QuoteStatus.Rejected, ReviewerSide, IsVendorGated: false),
         new(QuoteStatus.UnderReview, QuoteAction.ReturnToSubmitted, QuoteStatus.Submitted, ReviewerSide, IsVendorGated: false),
         new(QuoteStatus.UnderReview, QuoteAction.Expire, QuoteStatus.Expired, AppRole.Admin, IsVendorGated: false),
+
+        new(QuoteStatus.Withdrawn, QuoteAction.Edit, QuoteStatus.Draft, VendorSide, IsVendorGated: true),
+        new(QuoteStatus.Expired, QuoteAction.Edit, QuoteStatus.Draft, VendorSide, IsVendorGated: true),
+        new(QuoteStatus.Rejected, QuoteAction.Edit, QuoteStatus.Draft, VendorSide, IsVendorGated: true),
     ];
 
     public static IReadOnlyList<QuoteTransition> All => Table;
@@ -88,9 +92,17 @@ public static class QuoteTransitions
     }
 
     /// <summary>
-    /// Whether a quote's business fields may still be changed.
+    /// Whether a quote's business fields may be changed. Draft edits in place; Withdrawn, Expired,
+    /// and Rejected reopen as Draft when saved.
     /// </summary>
-    public static bool IsEditable(QuoteStatus status) => status is QuoteStatus.Draft;
+    public static bool IsEditable(QuoteStatus status) =>
+        status is QuoteStatus.Draft or QuoteStatus.Withdrawn or QuoteStatus.Expired or QuoteStatus.Rejected;
+
+    /// <summary>
+    /// Inactive quotes no longer compete on the request — the vendor may revise this row or draft anew.
+    /// </summary>
+    public static bool IsInactive(QuoteStatus status) =>
+        status is QuoteStatus.Withdrawn or QuoteStatus.Expired or QuoteStatus.Rejected;
 
     private static bool IsPermitted(QuoteTransition transition, DomainActor actor, Guid vendorOrganizationId)
     {

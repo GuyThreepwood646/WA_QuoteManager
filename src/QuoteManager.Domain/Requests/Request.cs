@@ -200,10 +200,24 @@ public sealed class Request : AggregateRoot
         DateTimeOffset now,
         int? expectedVersion = null)
     {
+        if (Status != RequestStatus.Open)
+        {
+            throw new RequestNotEditableException(
+                $"Quotes on a request in state '{Status}' cannot be edited.");
+        }
+
         var quote = RequireQuote(quoteId);
-        Guard(quote, QuoteAction.Edit, actor, expectedVersion);
+        var from = quote.Status;
+        var resulting = Guard(quote, QuoteAction.Edit, actor, expectedVersion);
 
         quote.ApplyEdit(amount, expiresAt, notes);
+
+        if (from != resulting)
+        {
+            quote.ApplyStatus(resulting, now);
+            Raise(new QuoteStatusChanged(Id, quoteId, QuoteAction.Edit, from, resulting, null, actor.Id, now));
+        }
+
         Raise(new QuoteEdited(Id, quoteId, amount, actor.Id, now));
     }
 
@@ -224,6 +238,12 @@ public sealed class Request : AggregateRoot
             throw new ArgumentException(
                 $"Use {nameof(EditQuote)} for field changes; {nameof(QuoteAction.Edit)} is not a status transition.",
                 nameof(action));
+        }
+
+        if (Status != RequestStatus.Open)
+        {
+            throw new RequestNotEditableException(
+                $"Quote actions cannot be applied on a request in state '{Status}'.");
         }
 
         var quote = RequireQuote(quoteId);
@@ -249,7 +269,8 @@ public sealed class Request : AggregateRoot
 
         foreach (var sibling in _quotes)
         {
-            if (sibling.Id == quoteId || sibling.Status is not (QuoteStatus.Submitted or QuoteStatus.UnderReview))
+            if (sibling.Id == quoteId
+                || sibling.Status is QuoteStatus.Accepted or QuoteStatus.Rejected or QuoteStatus.Withdrawn or QuoteStatus.Expired)
             {
                 continue;
             }

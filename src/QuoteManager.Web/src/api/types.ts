@@ -84,20 +84,50 @@ export interface RequestDetailResponse {
   invitations: RequestInvitationItem[]
 }
 
+export interface OrganizationLocationItem {
+  id: string
+  address: string
+  phone: string | null
+  sortOrder: number
+}
+
 export interface OrganizationListItem {
   id: string
   name: string
   kind: string
   retiredAt: string | null
+  primaryAddress: string | null
+  primaryContactName: string | null
+  primaryContactEmail: string | null
+  primaryContactPhone: string | null
+  isPreferredVendor: boolean
+  locations: OrganizationLocationItem[]
 }
 
 export interface CreateOrganizationInput {
   name: string
   kind: 'Client' | 'Vendor'
+  primaryAddress?: string
+  primaryContactName?: string
+  primaryContactEmail?: string
+  primaryContactPhone?: string
+  isPreferredVendor?: boolean
+  locations?: OrganizationLocationInput[]
+}
+
+export interface OrganizationLocationInput {
+  address: string
+  phone?: string
 }
 
 export interface UpdateOrganizationInput {
   name: string
+  primaryAddress?: string
+  primaryContactName?: string
+  primaryContactEmail?: string
+  primaryContactPhone?: string
+  isPreferredVendor?: boolean
+  locations?: OrganizationLocationInput[]
 }
 
 export interface CreateRequestInput {

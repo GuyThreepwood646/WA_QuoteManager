@@ -9,14 +9,20 @@ import { listOrganizations } from '@/api/organizations'
 import { cancelRequest, getRequest, inviteVendor, updateRequest } from '@/api/requests'
 import { ActivityTimeline } from '@/components/activity-timeline'
 import { AddQuoteForm } from '@/components/add-quote-form'
+import { FormField } from '@/components/form-field'
 import { QuoteCard } from '@/components/quote-card'
 import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate } from '@/lib/format'
+import {
+  type FieldErrors,
+  clearFieldError,
+  hasFieldErrors,
+  validateRequired,
+} from '@/lib/form-validation'
 
 export function RequestDetailPage() {
   const { requestId } = useParams<{ requestId: string }>()
@@ -27,6 +33,7 @@ export function RequestDetailPage() {
   const [neededBy, setNeededBy] = useState('')
   const [vendorToInvite, setVendorToInvite] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
   const { data, isPending, isError } = useQuery({
     queryKey: ['requests', requestId],
@@ -94,6 +101,7 @@ export function RequestDetailPage() {
 
   function startEditing() {
     setError(null)
+    setFieldErrors({})
     setIsEditing(true)
     setTitle(data!.title)
     setDescription(data!.description ?? '')
@@ -103,6 +111,14 @@ export function RequestDetailPage() {
   function handleUpdateSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
+
+    const titleError = validateRequired(title, 'Title')
+    const next: FieldErrors = titleError ? { title: titleError } : {}
+    setFieldErrors(next)
+    if (hasFieldErrors(next)) {
+      return
+    }
+
     updateMutation.mutate()
   }
 
@@ -120,24 +136,44 @@ export function RequestDetailPage() {
       )}
 
       {isEditing ? (
-        <form onSubmit={handleUpdateSubmit} className="flex max-w-xl flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="title">Title</Label>
-            <Input id="title" value={title} onChange={(event) => setTitle(event.currentTarget.value)} required maxLength={200} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="description">Description</Label>
-            <Input id="description" value={description} onChange={(event) => setDescription(event.currentTarget.value)} maxLength={2000} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="neededBy">Needed by</Label>
-            <Input id="neededBy" type="date" value={neededBy} onChange={(event) => setNeededBy(event.currentTarget.value)} />
-          </div>
+        <form onSubmit={handleUpdateSubmit} noValidate className="flex max-w-xl flex-col gap-4">
+          <FormField id="title" label="Title" error={fieldErrors.title}>
+            <Input
+              value={title}
+              onChange={(event) => {
+                setTitle(event.currentTarget.value)
+                setFieldErrors((current) => clearFieldError(current, 'title'))
+              }}
+              maxLength={200}
+            />
+          </FormField>
+          <FormField id="description" label="Description">
+            <Input
+              value={description}
+              onChange={(event) => setDescription(event.currentTarget.value)}
+              maxLength={2000}
+            />
+          </FormField>
+          <FormField id="neededBy" label="Needed by">
+            <Input
+              type="date"
+              value={neededBy}
+              onChange={(event) => setNeededBy(event.currentTarget.value)}
+            />
+          </FormField>
           <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={title.trim() === '' || updateMutation.isPending}>
+            <Button type="submit" size="sm" disabled={updateMutation.isPending}>
               {updateMutation.isPending ? 'Saving…' : 'Save'}
             </Button>
-            <Button type="button" size="sm" variant="outline" onClick={() => setIsEditing(false)}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setIsEditing(false)
+                setFieldErrors({})
+              }}
+            >
               Cancel
             </Button>
           </div>
@@ -185,7 +221,7 @@ export function RequestDetailPage() {
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {data.quotes.map((quote) => (
-              <QuoteCard key={quote.id} requestId={data.id} quote={quote} />
+              <QuoteCard key={quote.id} requestId={data.id} quote={quote} readOnly={data.status !== 'Open'} />
             ))}
           </div>
         )}
@@ -227,7 +263,14 @@ export function RequestDetailPage() {
         </div>
       )}
 
-      {data.canAddQuote && <AddQuoteForm requestId={data.id} />}
+      {data.canAddQuote && (
+        <AddQuoteForm
+          requestId={data.id}
+          quotedVendorIds={data.quotes
+            .filter((quote) => !['Withdrawn', 'Expired', 'Rejected'].includes(quote.status))
+            .map((quote) => quote.vendorOrganizationId)}
+        />
+      )}
 
       <div className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold">Activity</h2>

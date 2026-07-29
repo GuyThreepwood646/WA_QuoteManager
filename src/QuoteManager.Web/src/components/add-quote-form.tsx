@@ -1,34 +1,65 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 
 import { ApiError } from '@/api/apiClient'
+import { listOrganizations } from '@/api/organizations'
 import { createQuote } from '@/api/requests'
 import { useAuth } from '@/auth/AuthProvider'
+import { FieldError, FormField, FormFieldRow, fieldControlProps } from '@/components/form-field'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  type FieldErrors,
+  clearFieldError,
+  hasFieldErrors,
+  validateCurrencyCode,
+  validatePositiveAmount,
+  validateRequired,
+} from '@/lib/form-validation'
 
 /**
- * Shown only when the server says <c>canAddQuote</c> - the request-level counterpart to a quote's
- * <c>permittedActions</c>. The vendor organization is the caller's own,
- * never a field on this form, so there is nothing here for a Vendor to get wrong about whose
- * organization the draft belongs to.
+ * Shown when the server says <c>canAddQuote</c>. Vendors draft for their own organization;
+ * Admins pick the vendor they are drafting on behalf of.
  */
-export function AddQuoteForm({ requestId }: { requestId: string }) {
+export function AddQuoteForm({
+  requestId,
+  quotedVendorIds,
+}: {
+  requestId: string
+  quotedVendorIds: string[]
+}) {
   const { session } = useAuth()
   const queryClient = useQueryClient()
+  const isAdmin = session?.user.roles.includes('Admin') ?? false
+
+  const [vendorOrganizationId, setVendorOrganizationId] = useState(
+    isAdmin ? '' : (session?.user.organizationId ?? ''),
+  )
   const [amount, setAmount] = useState('')
   const [currency, setCurrency] = useState('USD')
   const [expiresAt, setExpiresAt] = useState('')
   const [notes, setNotes] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+
+  const { data: organizations } = useQuery({
+    queryKey: ['organizations'],
+    queryFn: () => listOrganizations(),
+    enabled: isAdmin,
+  })
+
+  const quoted = new Set(quotedVendorIds)
+  const availableVendors =
+    organizations?.items.filter((org) => org.kind === 'Vendor' && !quoted.has(org.id)) ?? []
 
   const mutation = useMutation({
     mutationFn: () =>
       createQuote(requestId, {
-        vendorOrganizationId: session!.user.organizationId!,
+        vendorOrganizationId,
         amount: Number(amount),
         currency,
         expiresAt: expiresAt === '' ? undefined : new Date(expiresAt).toISOString(),
@@ -36,27 +67,59 @@ export function AddQuoteForm({ requestId }: { requestId: string }) {
       }),
     onSuccess: () => {
       setError(null)
+      setFieldErrors({})
       setAmount('')
       setNotes('')
       setExpiresAt('')
+      if (isAdmin) {
+        setVendorOrganizationId('')
+      }
       void queryClient.invalidateQueries({ queryKey: ['requests', requestId] })
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Something went wrong.'),
   })
 
+  function validateForm(): FieldErrors {
+    const next: FieldErrors = {}
+
+    if (isAdmin) {
+      const vendorError = validateRequired(vendorOrganizationId, 'Vendor')
+      if (vendorError) {
+        next.vendorOrganizationId = vendorError
+      }
+    }
+
+    const amountError = validatePositiveAmount(amount)
+    if (amountError) {
+      next.amount = amountError
+    }
+
+    const currencyError = validateCurrencyCode(currency)
+    if (currencyError) {
+      next.currency = currencyError
+    }
+
+    return next
+  }
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
+
+    const next = validateForm()
+    setFieldErrors(next)
+    if (hasFieldErrors(next)) {
+      return
+    }
+
     mutation.mutate()
   }
-
-  const canSubmit = amount !== '' && Number(amount) > 0 && currency.trim().length === 3
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Draft a quote</CardTitle>
+        <CardTitle className="text-sm">{isAdmin ? 'Draft a quote on behalf of a vendor' : 'Draft a quote'}</CardTitle>
       </CardHeader>
       <CardContent>
         {error && (
@@ -67,54 +130,98 @@ export function AddQuoteForm({ requestId }: { requestId: string }) {
             {error}
           </div>
         )}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <div className="grid grid-cols-2 gap-3">
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-3">
+          {isAdmin && (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="amount">Amount</Label>
-              <Input
-                id="amount"
-                type="number"
-                min={0.01}
-                step="0.01"
-                value={amount}
-                onChange={(event) => setAmount(event.currentTarget.value)}
-                required
-                autoFocus
-              />
+              <Label htmlFor="vendorOrganizationId">Vendor</Label>
+              {fieldErrors.vendorOrganizationId && (
+                <FieldError id="vendorOrganizationId-error">{fieldErrors.vendorOrganizationId}</FieldError>
+              )}
+              <Select
+                value={vendorOrganizationId}
+                onValueChange={(value) => {
+                  setVendorOrganizationId(value)
+                  setFieldErrors((current) => clearFieldError(current, 'vendorOrganizationId'))
+                }}
+              >
+                <SelectTrigger
+                  className="w-full"
+                  {...fieldControlProps('vendorOrganizationId', fieldErrors.vendorOrganizationId)}
+                >
+                  <SelectValue
+                    placeholder={
+                      availableVendors.length === 0
+                        ? 'No vendors left to quote for'
+                        : 'Select a vendor'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableVendors.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="currency">Currency</Label>
-              <Input
-                id="currency"
-                value={currency}
-                onChange={(event) => setCurrency(event.currentTarget.value.toUpperCase())}
-                maxLength={3}
-                required
-              />
-            </div>
-          </div>
+          )}
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="expiresAt">Expires</Label>
+          <FormFieldRow
+            fields={[
+              {
+                id: 'amount',
+                label: 'Amount',
+                error: fieldErrors.amount,
+                children: (
+                  <Input
+                    type="number"
+                    min={0.01}
+                    step="0.01"
+                    value={amount}
+                    onChange={(event) => {
+                      setAmount(event.currentTarget.value)
+                      setFieldErrors((current) => clearFieldError(current, 'amount'))
+                    }}
+                    autoFocus={!isAdmin}
+                  />
+                ),
+              },
+              {
+                id: 'currency',
+                label: 'Currency',
+                error: fieldErrors.currency,
+                children: (
+                  <Input
+                    value={currency}
+                    onChange={(event) => {
+                      setCurrency(event.currentTarget.value.toUpperCase())
+                      setFieldErrors((current) => clearFieldError(current, 'currency'))
+                    }}
+                    maxLength={3}
+                  />
+                ),
+              },
+            ]}
+          />
+
+          <FormField id="expiresAt" label="Expires">
             <Input
-              id="expiresAt"
               type="date"
               value={expiresAt}
               onChange={(event) => setExpiresAt(event.currentTarget.value)}
             />
-          </div>
+          </FormField>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="notes">Notes</Label>
+          <FormField id="notes" label="Notes">
             <Input
-              id="notes"
               value={notes}
               onChange={(event) => setNotes(event.currentTarget.value)}
               maxLength={2000}
             />
-          </div>
+          </FormField>
 
-          <Button type="submit" size="sm" disabled={!canSubmit || mutation.isPending} className="mt-1 self-start">
+          <Button type="submit" size="sm" disabled={mutation.isPending} className="mt-1 self-start">
             {mutation.isPending ? 'Submitting…' : 'Save draft'}
           </Button>
         </form>

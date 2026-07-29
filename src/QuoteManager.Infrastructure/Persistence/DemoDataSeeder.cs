@@ -50,6 +50,53 @@ public sealed class DemoDataSeeder(
         var crateworks = Organization.Create("Crateworks Packing & Crating", OrganizationKind.Vendor, system, now);
         var interstate = Organization.Create("Interstate Freight Partners", OrganizationKind.Vendor, system, now);
 
+        SeedOrganizationProfile(
+            meridian,
+            "1200 Peachtree Industrial Blvd, Suite 400, Atlanta, GA 30341",
+            "Jordan Ellis",
+            "jordan.ellis@meridianpharma.test",
+            "+1 (404) 555-0182",
+            false,
+            [new("450 Research Parkway, Durham, NC 27709", "+1 (919) 555-0134")]);
+        SeedOrganizationProfile(
+            palmetto,
+            "88 King Street, Charleston, SC 29401",
+            "Morgan Blake",
+            "morgan.blake@palmettoretail.test",
+            "+1 (843) 555-0147",
+            false,
+            [
+                new("2100 Commerce Drive, Charlotte, NC 28206", "+1 (704) 555-0171"),
+                new("15 Harbor View Road, Savannah, GA 31401", "+1 (912) 555-0199"),
+            ]);
+        SeedOrganizationProfile(
+            secureBase,
+            "7420 Industrial Park Road, Charlotte, NC 28213",
+            "Alex Rivera",
+            "alex.rivera@securebase.test",
+            "+1 (704) 555-0198",
+            true,
+            [
+                new("910 Logistics Way, Raleigh, NC 27603", "+1 (919) 555-0148"),
+                new("300 Storage Lane, Greenville, SC 29607", "+1 (864) 555-0166"),
+            ]);
+        SeedOrganizationProfile(
+            crateworks,
+            "55 Crate Lane, Greensboro, NC 27409",
+            "Kim Olsen",
+            "kim.olsen@crateworks.test",
+            "+1 (336) 555-0163",
+            false,
+            [new("18 Packing Court, Columbia, SC 29201", "+1 (803) 555-0127")]);
+        SeedOrganizationProfile(
+            interstate,
+            "400 Freight Terminal Drive, Spartanburg, SC 29303",
+            "Rob Chen",
+            "rob.chen@interstatefreight.test",
+            "+1 (864) 555-0120",
+            true,
+            [new("2200 Interstate Blvd, Atlanta, GA 30336", "+1 (404) 555-0188")]);
+
         context.Organizations.AddRange(meridian, palmetto, secureBase, crateworks, interstate);
 
         var admin = CreateUser("admin@warehouseanywhere.test", "Ada Admin", AppRole.Admin, null);
@@ -184,6 +231,27 @@ public sealed class DemoDataSeeder(
     }
 
     private static Money Money(decimal amount) => new(amount, Currency);
+
+    private static void SeedOrganizationProfile(
+        Organization organization,
+        string primaryAddress,
+        string primaryContactName,
+        string primaryContactEmail,
+        string primaryContactPhone,
+        bool isPreferredVendor,
+        OrganizationLocationInput[] locations)
+    {
+        organization.UpdateProfile(
+            organization.Name,
+            primaryAddress,
+            primaryContactName,
+            primaryContactEmail,
+            primaryContactPhone,
+            isPreferredVendor,
+            locations,
+            DomainActor.System,
+            organization.CreatedAt);
+    }
 
     private AppUser CreateUser(string email, string displayName, AppRole roles, Guid? organizationId)
     {

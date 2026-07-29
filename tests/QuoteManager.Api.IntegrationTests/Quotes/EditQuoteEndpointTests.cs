@@ -23,6 +23,82 @@ public sealed class EditQuoteEndpointTests : IDisposable
     public void Dispose() => _factory.Dispose();
 
     [Fact]
+    public async Task A_withdrawn_quote_can_be_revised_back_to_draft()
+    {
+        var (requestId, quoteId) = await FindQuoteAsync(
+            "Pop-up retail storage & fixture staging", "vendor2@warehouseanywhere.test");
+        var client = await LoginAsAsync("vendor2@warehouseanywhere.test");
+
+        var draft = await GetQuoteAsync(client, requestId, quoteId);
+        using var withdraw = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/requests/{requestId}/quotes/{quoteId}/transitions")
+        {
+            Content = JsonContent.Create(new { action = "Withdraw" }),
+        };
+        withdraw.Headers.TryAddWithoutValidation("If-Match", $"\"{draft.Version}\"");
+        (await client.SendAsync(withdraw, TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
+
+        var withdrawn = await GetQuoteAsync(client, requestId, quoteId);
+        withdrawn.Status.ShouldBe("Withdrawn");
+
+        var response = await SendEditAsync(
+            client, requestId, quoteId, withdrawn.Version,
+            new { amount = 14_500m, currency = "USD", notes = "Revised after withdrawal" });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var revised = await response.Content.ReadFromJsonAsync<QuoteResponse>(TestContext.Current.CancellationToken);
+        revised.ShouldNotBeNull();
+        revised.Status.ShouldBe("Draft");
+        revised.PermittedActions.ShouldContain("Submit");
+    }
+
+    [Fact]
+    public async Task A_rejected_quote_can_be_revised_back_to_draft()
+    {
+        var (requestId, quoteId) = await FindQuoteAsync(
+            "Regional sample storage — Southeast territory", "vendor2@warehouseanywhere.test");
+        var reviewer = await LoginAsAsync("reviewer@warehouseanywhere.test");
+        var vendor = await LoginAsAsync("vendor2@warehouseanywhere.test");
+
+        var submitted = await GetQuoteAsync(reviewer, requestId, quoteId);
+        submitted.Status.ShouldBe("Submitted");
+
+        using var startReview = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/requests/{requestId}/quotes/{quoteId}/transitions")
+        {
+            Content = JsonContent.Create(new { action = "StartReview" }),
+        };
+        startReview.Headers.TryAddWithoutValidation("If-Match", $"\"{submitted.Version}\"");
+        (await reviewer.SendAsync(startReview, TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
+
+        var underReview = await GetQuoteAsync(reviewer, requestId, quoteId);
+        underReview.Status.ShouldBe("UnderReview");
+
+        using var reject = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/requests/{requestId}/quotes/{quoteId}/transitions")
+        {
+            Content = JsonContent.Create(new { action = "Reject" }),
+        };
+        reject.Headers.TryAddWithoutValidation("If-Match", $"\"{underReview.Version}\"");
+        (await reviewer.SendAsync(reject, TestContext.Current.CancellationToken)).EnsureSuccessStatusCode();
+
+        var rejected = await GetQuoteAsync(vendor, requestId, quoteId);
+        rejected.Status.ShouldBe("Rejected");
+
+        var response = await SendEditAsync(
+            vendor, requestId, quoteId, rejected.Version,
+            new { amount = 11_250m, currency = "USD", notes = "Revised after rejection" });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        var revised = await response.Content.ReadFromJsonAsync<QuoteResponse>(TestContext.Current.CancellationToken);
+        revised.ShouldNotBeNull();
+        revised.Status.ShouldBe("Draft");
+    }
+
+    [Fact]
     public async Task The_owning_vendor_can_edit_its_own_draft_quote()
     {
         var (requestId, quoteId) = await FindQuoteAsync(

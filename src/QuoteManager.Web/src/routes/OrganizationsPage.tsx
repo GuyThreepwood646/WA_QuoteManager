@@ -1,23 +1,37 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Link } from 'react-router'
 
 import { ApiError } from '@/api/apiClient'
 import { listOrganizations, retireOrganization, updateOrganization } from '@/api/organizations'
+import type { OrganizationListItem } from '@/api/types'
 import { useAuth } from '@/auth/AuthProvider'
+import {
+  OrganizationContactSummary,
+  OrganizationDetailPanel,
+  PreferredVendorMark,
+} from '@/components/organization-detail-panel'
+import type { OrganizationDraft } from '@/lib/organization-validation'
+import {
+  draftToLocationInputs,
+  organizationToDraft,
+  validateOrganizationDraft,
+} from '@/lib/organization-validation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { type FieldErrors, clearFieldError } from '@/lib/form-validation'
 
 export function OrganizationsPage() {
   const queryClient = useQueryClient()
   const { session } = useAuth()
   const isAdmin = session?.user.roles.includes('Admin') ?? false
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [name, setName] = useState('')
+  const [drafts, setDrafts] = useState<Record<string, OrganizationDraft>>({})
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [error, setError] = useState<string | null>(null)
 
   const { data, isPending, isError } = useQuery({
@@ -25,11 +39,21 @@ export function OrganizationsPage() {
     queryFn: () => listOrganizations(100, isAdmin),
   })
 
-  const renameMutation = useMutation({
-    mutationFn: (organizationId: string) => updateOrganization(organizationId, { name }),
+  const updateMutation = useMutation({
+    mutationFn: ({ organizationId, draft }: { organizationId: string; draft: OrganizationDraft }) =>
+      updateOrganization(organizationId, {
+        name: draft.name.trim(),
+        primaryAddress: draft.primaryAddress.trim() === '' ? undefined : draft.primaryAddress.trim(),
+        primaryContactName: draft.primaryContactName.trim() === '' ? undefined : draft.primaryContactName.trim(),
+        primaryContactEmail: draft.primaryContactEmail.trim() === '' ? undefined : draft.primaryContactEmail.trim(),
+        primaryContactPhone: draft.primaryContactPhone.trim() === '' ? undefined : draft.primaryContactPhone.trim(),
+        isPreferredVendor: draft.isPreferredVendor,
+        locations: draftToLocationInputs(draft),
+      }),
     onSuccess: () => {
       setError(null)
       setEditingId(null)
+      setFieldErrors({})
       void queryClient.invalidateQueries({ queryKey: ['organizations'] })
     },
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Something went wrong.'),
@@ -39,6 +63,8 @@ export function OrganizationsPage() {
     mutationFn: (organizationId: string) => retireOrganization(organizationId),
     onSuccess: () => {
       setError(null)
+      setExpandedId(null)
+      setEditingId(null)
       void queryClient.invalidateQueries({ queryKey: ['organizations'] })
     },
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Something went wrong.'),
@@ -48,8 +74,48 @@ export function OrganizationsPage() {
     return <Skeleton className="h-64 rounded-lg" />
   }
 
-  if (isError) {
+  if (isError || !data) {
     return <p className="text-sm text-destructive">Could not load organizations.</p>
+  }
+
+  const columnCount = 5
+
+  function toggleDetails(org: OrganizationListItem) {
+    setError(null)
+    setFieldErrors({})
+
+    if (expandedId === org.id) {
+      setExpandedId(null)
+      setEditingId(null)
+      return
+    }
+
+    setExpandedId(org.id)
+    setEditingId(null)
+    setDrafts((current) => ({ ...current, [org.id]: organizationToDraft(org) }))
+  }
+
+  function startEditing(org: OrganizationListItem) {
+    setEditingId(org.id)
+    setFieldErrors({})
+    setDrafts((current) => ({ ...current, [org.id]: organizationToDraft(org) }))
+  }
+
+  function discardEditing(org: OrganizationListItem) {
+    setEditingId(null)
+    setFieldErrors({})
+    setDrafts((current) => ({ ...current, [org.id]: organizationToDraft(org) }))
+  }
+
+  function saveDraft(org: OrganizationListItem) {
+    const draft = drafts[org.id] ?? organizationToDraft(org)
+    const nextErrors = validateOrganizationDraft(draft, org.kind)
+    setFieldErrors(nextErrors)
+    if (Object.keys(nextErrors).length > 0) {
+      return
+    }
+
+    updateMutation.mutate({ organizationId: org.id, draft })
   }
 
   return (
@@ -76,61 +142,44 @@ export function OrganizationsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+              <TableHead>Primary contact</TableHead>
+              <TableHead>Preferred</TableHead>
               <TableHead>Kind</TableHead>
-              {isAdmin && <TableHead className="text-right">Actions</TableHead>}
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {data.items.map((org) => (
-              <TableRow key={org.id}>
-                <TableCell className="font-medium">
-                  {editingId === org.id ? (
-                    <Input
-                      value={name}
-                      onChange={(event) => setName(event.currentTarget.value)}
-                      maxLength={200}
-                      autoFocus
-                      className="h-8"
-                    />
-                  ) : (
-                    org.name
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">{org.kind}</Badge>
-                    {org.retiredAt && <Badge variant="outline">Retired</Badge>}
-                  </div>
-                </TableCell>
-                {isAdmin && (
-                  <TableCell className="text-right">
-                    {editingId === org.id ? (
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          disabled={name.trim() === '' || renameMutation.isPending}
-                          onClick={() => renameMutation.mutate(org.id)}
-                        >
-                          Save
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
-                          Cancel
-                        </Button>
+            {data.items.map((org) => {
+              const isExpanded = expandedId === org.id
+              const isEditing = editingId === org.id
+              const draft = drafts[org.id] ?? organizationToDraft(org)
+
+              return (
+                <Fragment key={org.id}>
+                  <TableRow>
+                    <TableCell className="font-medium">{org.name}</TableCell>
+                    <TableCell>
+                      <OrganizationContactSummary org={org} />
+                    </TableCell>
+                    <TableCell>
+                      {org.kind === 'Vendor' ? (
+                        <PreferredVendorMark isPreferred={org.isPreferredVendor} />
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{org.kind}</Badge>
+                        {org.retiredAt && <Badge variant="outline">Retired</Badge>}
                       </div>
-                    ) : (
+                    </TableCell>
+                    <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setError(null)
-                            setEditingId(org.id)
-                            setName(org.name)
-                          }}
-                        >
-                          Rename
+                        <Button size="sm" variant="outline" onClick={() => toggleDetails(org)}>
+                          {isExpanded ? 'Hide' : 'Details'}
                         </Button>
-                        {!org.retiredAt && (
+                        {isAdmin && !org.retiredAt && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -145,11 +194,30 @@ export function OrganizationsPage() {
                           </Button>
                         )}
                       </div>
-                    )}
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
+                    </TableCell>
+                  </TableRow>
+                  {isExpanded && (
+                    <TableRow>
+                      <TableCell colSpan={columnCount} className="bg-muted/10 p-4">
+                        <OrganizationDetailPanel
+                          org={org}
+                          isEditing={isEditing}
+                          draft={draft}
+                          fieldErrors={fieldErrors}
+                          isSaving={updateMutation.isPending}
+                          isAdmin={isAdmin}
+                          onDraftChange={(next) => setDrafts((current) => ({ ...current, [org.id]: next }))}
+                          onClearFieldError={(field) => setFieldErrors((current) => clearFieldError(current, field))}
+                          onEdit={() => startEditing(org)}
+                          onDiscard={() => discardEditing(org)}
+                          onSave={() => saveDraft(org)}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </Fragment>
+              )
+            })}
           </TableBody>
         </Table>
       </div>

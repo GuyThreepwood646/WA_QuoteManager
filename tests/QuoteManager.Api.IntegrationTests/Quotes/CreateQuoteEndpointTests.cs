@@ -22,6 +22,159 @@ public sealed class CreateQuoteEndpointTests : IDisposable
     public void Dispose() => _factory.Dispose();
 
     [Fact]
+    public async Task An_admin_can_draft_a_quote_on_behalf_of_any_vendor()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var client = await LoginAsAsync("admin@warehouseanywhere.test");
+        var (requestId, interstateId) = await FindRequestAndVendorAsync(
+            "Cold-chain sample storage pilot — new territory launch", "vendor3@warehouseanywhere.test", ct);
+
+        var before = await client.GetFromJsonAsync<RequestDetailResponse>($"/api/requests/{requestId}", ct);
+        before!.CanAddQuote.ShouldBeTrue("Admin drafts on behalf of vendors on any open request");
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/requests/{requestId}/quotes",
+            new { vendorOrganizationId = interstateId, amount = 2100m, currency = "USD", notes = "Entered for Interstate" },
+            ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var body = await response.Content.ReadFromJsonAsync<QuoteResponse>(ct);
+
+        body.ShouldNotBeNull();
+        body.VendorOrganizationId.ShouldBe(interstateId);
+        body.Status.ShouldBe("Draft");
+        body.Amount.ShouldBe(2100m);
+    }
+
+    [Fact]
+    public async Task A_vendor_can_draft_again_after_a_reviewer_rejects_its_quote()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var vendorClient = await LoginAsAsync("vendor3@warehouseanywhere.test");
+        var reviewerClient = await LoginAsAsync("reviewer@warehouseanywhere.test");
+        var (requestId, interstateId) = await FindRequestAndVendorAsync(
+            "Cold-chain sample storage pilot — new territory launch", "vendor3@warehouseanywhere.test", ct);
+
+        var created = await vendorClient.PostAsJsonAsync(
+            $"/api/requests/{requestId}/quotes",
+            new { vendorOrganizationId = interstateId, amount = 500m, currency = "USD" },
+            ct);
+        created.EnsureSuccessStatusCode();
+        var quote = await created.Content.ReadFromJsonAsync<QuoteResponse>(ct);
+
+        using var submit = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/requests/{requestId}/quotes/{quote!.Id}/transitions")
+        {
+            Content = JsonContent.Create(new { action = "Submit" }),
+        };
+        submit.Headers.TryAddWithoutValidation("If-Match", $"\"{quote.Version}\"");
+        (await vendorClient.SendAsync(submit, ct)).EnsureSuccessStatusCode();
+
+        var submitted = await vendorClient.GetFromJsonAsync<QuoteResponse>(
+            $"/api/requests/{requestId}/quotes/{quote.Id}", ct);
+
+        using var startReview = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/requests/{requestId}/quotes/{quote.Id}/transitions")
+        {
+            Content = JsonContent.Create(new { action = "StartReview" }),
+        };
+        startReview.Headers.TryAddWithoutValidation("If-Match", $"\"{submitted!.Version}\"");
+        (await reviewerClient.SendAsync(startReview, ct)).EnsureSuccessStatusCode();
+
+        var underReview = await vendorClient.GetFromJsonAsync<QuoteResponse>(
+            $"/api/requests/{requestId}/quotes/{quote.Id}", ct);
+
+        using var reject = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/requests/{requestId}/quotes/{quote.Id}/transitions")
+        {
+            Content = JsonContent.Create(new { action = "Reject" }),
+        };
+        reject.Headers.TryAddWithoutValidation("If-Match", $"\"{underReview!.Version}\"");
+        (await reviewerClient.SendAsync(reject, ct)).EnsureSuccessStatusCode();
+
+        var detail = await vendorClient.GetFromJsonAsync<RequestDetailResponse>($"/api/requests/{requestId}", ct);
+        detail!.CanAddQuote.ShouldBeTrue("a rejected quote must not block drafting again");
+
+        var secondDraft = await vendorClient.PostAsJsonAsync(
+            $"/api/requests/{requestId}/quotes",
+            new { vendorOrganizationId = interstateId, amount = 650m, currency = "USD" },
+            ct);
+        secondDraft.StatusCode.ShouldBe(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task A_vendor_can_draft_again_after_withdrawing_their_only_quote()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var client = await LoginAsAsync("vendor3@warehouseanywhere.test");
+        var (requestId, interstateId) = await FindRequestAndVendorAsync(
+            "Cold-chain sample storage pilot — new territory launch", "vendor3@warehouseanywhere.test", ct);
+
+        var created = await client.PostAsJsonAsync(
+            $"/api/requests/{requestId}/quotes",
+            new { vendorOrganizationId = interstateId, amount = 500m, currency = "USD" },
+            ct);
+        created.EnsureSuccessStatusCode();
+        var quote = await created.Content.ReadFromJsonAsync<QuoteResponse>(ct);
+
+        using var withdraw = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/requests/{requestId}/quotes/{quote!.Id}/transitions")
+        {
+            Content = JsonContent.Create(new { action = "Withdraw" }),
+        };
+        withdraw.Headers.TryAddWithoutValidation("If-Match", $"\"{quote.Version}\"");
+        (await client.SendAsync(withdraw, ct)).EnsureSuccessStatusCode();
+
+        var detail = await client.GetFromJsonAsync<RequestDetailResponse>($"/api/requests/{requestId}", ct);
+        detail!.CanAddQuote.ShouldBeTrue("a withdrawn quote must not block drafting again");
+
+        var secondDraft = await client.PostAsJsonAsync(
+            $"/api/requests/{requestId}/quotes",
+            new { vendorOrganizationId = interstateId, amount = 600m, currency = "USD" },
+            ct);
+        secondDraft.StatusCode.ShouldBe(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task An_admin_can_draft_for_a_vendor_again_after_that_vendor_withdrew()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var vendorClient = await LoginAsAsync("vendor3@warehouseanywhere.test");
+        var adminClient = await LoginAsAsync("admin@warehouseanywhere.test");
+        var (requestId, interstateId) = await FindRequestAndVendorAsync(
+            "Cold-chain sample storage pilot — new territory launch", "vendor3@warehouseanywhere.test", ct);
+
+        var created = await vendorClient.PostAsJsonAsync(
+            $"/api/requests/{requestId}/quotes",
+            new { vendorOrganizationId = interstateId, amount = 500m, currency = "USD" },
+            ct);
+        created.EnsureSuccessStatusCode();
+        var quote = await created.Content.ReadFromJsonAsync<QuoteResponse>(ct);
+
+        using var withdraw = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/requests/{requestId}/quotes/{quote!.Id}/transitions")
+        {
+            Content = JsonContent.Create(new { action = "Withdraw" }),
+        };
+        withdraw.Headers.TryAddWithoutValidation("If-Match", $"\"{quote.Version}\"");
+        (await vendorClient.SendAsync(withdraw, ct)).EnsureSuccessStatusCode();
+
+        var detail = await adminClient.GetFromJsonAsync<RequestDetailResponse>($"/api/requests/{requestId}", ct);
+        detail!.CanAddQuote.ShouldBeTrue();
+
+        var adminDraft = await adminClient.PostAsJsonAsync(
+            $"/api/requests/{requestId}/quotes",
+            new { vendorOrganizationId = interstateId, amount = 900m, currency = "USD" },
+            ct);
+        adminDraft.StatusCode.ShouldBe(HttpStatusCode.Created);
+    }
+
+    [Fact]
     public async Task A_vendor_can_draft_a_quote_for_its_own_organization_on_an_open_request()
     {
         var ct = TestContext.Current.CancellationToken;

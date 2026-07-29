@@ -8,11 +8,22 @@ import { ApiError } from '@/api/apiClient'
 import { createOrganization } from '@/api/organizations'
 import type { CreateOrganizationInput } from '@/api/types'
 import { useAuth } from '@/auth/AuthProvider'
+import { FieldError, fieldControlProps } from '@/components/form-field'
+import { OrganizationProfileFields } from '@/components/organization-detail-panel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  type FieldErrors,
+  clearFieldError,
+  hasFieldErrors,
+} from '@/lib/form-validation'
+import {
+  draftToLocationInputs,
+  emptyOrganizationDraft,
+  validateOrganizationDraft,
+} from '@/lib/organization-validation'
 
 /**
  * Creating an organization is Admin-only, mirroring the same gate on <c>Organization.Create</c>
@@ -23,12 +34,23 @@ export function NewOrganizationPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { session } = useAuth()
-  const [name, setName] = useState('')
   const [kind, setKind] = useState<CreateOrganizationInput['kind'] | ''>('')
+  const [draft, setDraft] = useState(emptyOrganizationDraft())
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
   const mutation = useMutation({
-    mutationFn: () => createOrganization({ name, kind: kind as CreateOrganizationInput['kind'] }),
+    mutationFn: () =>
+      createOrganization({
+        name: draft.name.trim(),
+        kind: kind as CreateOrganizationInput['kind'],
+        primaryAddress: draft.primaryAddress.trim() === '' ? undefined : draft.primaryAddress.trim(),
+        primaryContactName: draft.primaryContactName.trim() === '' ? undefined : draft.primaryContactName.trim(),
+        primaryContactEmail: draft.primaryContactEmail.trim() === '' ? undefined : draft.primaryContactEmail.trim(),
+        primaryContactPhone: draft.primaryContactPhone.trim() === '' ? undefined : draft.primaryContactPhone.trim(),
+        isPreferredVendor: draft.isPreferredVendor,
+        locations: draftToLocationInputs(draft),
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['organizations'] })
       navigate('/organizations')
@@ -36,13 +58,41 @@ export function NewOrganizationPage() {
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Something went wrong.'),
   })
 
+  function validateForm(): FieldErrors {
+    const next = validateOrganizationDraft(draft, kind)
+
+    if (kind === '') {
+      next.kind = 'Kind is required.'
+    }
+
+    return next
+  }
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
+
+    const next = validateForm()
+    setFieldErrors(next)
+    if (hasFieldErrors(next)) {
+      return
+    }
+
     mutation.mutate()
   }
 
-  const canSubmit = name.trim() !== '' && kind !== ''
+  function handleKindChange(value: string) {
+    const nextKind = value as CreateOrganizationInput['kind']
+    setKind(nextKind)
+    setFieldErrors((current) => clearFieldError(current, 'kind'))
+
+    // Mirrors the domain rule that only vendors can be preferred - switching away from Vendor
+    // drops a checked flag rather than leaving it set for a kind that would reject it on submit.
+    if (nextKind !== 'Vendor' && draft.isPreferredVendor) {
+      setDraft((current) => ({ ...current, isPreferredVendor: false }))
+    }
+  }
+
   const isAdmin = session?.user.roles.includes('Admin') ?? false
 
   return (
@@ -52,7 +102,7 @@ export function NewOrganizationPage() {
         Back to organizations
       </Link>
 
-      <Card className="max-w-xl">
+      <Card className="max-w-2xl">
         <CardHeader>
           <CardTitle>New organization</CardTitle>
           <CardDescription>Add a client or vendor organization to the directory.</CardDescription>
@@ -76,23 +126,12 @@ export function NewOrganizationPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={name}
-                onChange={(event) => setName(event.currentTarget.value)}
-                required
-                autoFocus
-                maxLength={200}
-              />
-            </div>
-
+          <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="kind">Kind</Label>
-              <Select value={kind} onValueChange={(value) => setKind(value as CreateOrganizationInput['kind'])} required>
-                <SelectTrigger id="kind" className="w-full">
+              {fieldErrors.kind && <FieldError id="kind-error">{fieldErrors.kind}</FieldError>}
+              <Select value={kind} onValueChange={handleKindChange}>
+                <SelectTrigger className="w-full" {...fieldControlProps('kind', fieldErrors.kind)}>
                   <SelectValue placeholder="Select a kind" />
                 </SelectTrigger>
                 <SelectContent>
@@ -102,7 +141,16 @@ export function NewOrganizationPage() {
               </Select>
             </div>
 
-            <Button type="submit" disabled={!canSubmit || mutation.isPending} className="mt-2 self-start">
+            <OrganizationProfileFields
+              idPrefix="new"
+              draft={draft}
+              fieldErrors={fieldErrors}
+              isVendor={kind === 'Vendor'}
+              onDraftChange={setDraft}
+              onClearFieldError={(field) => setFieldErrors((current) => clearFieldError(current, field))}
+            />
+
+            <Button type="submit" disabled={mutation.isPending} className="mt-2 self-start">
               {mutation.isPending ? 'Creating…' : 'Create organization'}
             </Button>
           </form>
