@@ -46,8 +46,8 @@ export function LoginPage() {
 
       <Card className="relative w-full max-w-sm border-border/60 shadow-2xl shadow-black/40">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-xl">Quote Manager</CardTitle>
-          <CardDescription>Sign in to review requests and quotes.</CardDescription>
+          <CardTitle className="text-xl">Warehouse Anywhere</CardTitle>
+          <CardDescription>Sign in to review storage requests and partner quotes.</CardDescription>
         </CardHeader>
         <CardContent>
           {error && (

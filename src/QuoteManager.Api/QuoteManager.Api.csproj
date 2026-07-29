@@ -4,6 +4,12 @@
     <UserSecretsId>quotemanager-api</UserSecretsId>
   </PropertyGroup>
 
+  <!-- AD-8: required for the source-generated minimal API validation interceptor (AddValidation)
+       that drives IValidatableObject types in Api/Models. -->
+  <PropertyGroup>
+    <InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.AspNetCore.Http.Validation.Generated</InterceptorsNamespaces>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\QuoteManager.Application\QuoteManager.Application.csproj" />
     <ProjectReference Include="..\QuoteManager.Infrastructure\QuoteManager.Infrastructure.csproj" />
@@ -13,7 +19,6 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Scalar.AspNetCore" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
-    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Serilog.Sinks.Console" />
     <PackageReference Include="Serilog.Sinks.File" />

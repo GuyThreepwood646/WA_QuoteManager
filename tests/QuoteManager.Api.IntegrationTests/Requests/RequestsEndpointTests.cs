@@ -19,7 +19,7 @@ public sealed class RequestsEndpointTests : IDisposable
     public async Task Listing_requests_returns_every_seeded_request_with_a_quote_count()
     {
         var ct = TestContext.Current.CancellationToken;
-        var client = await LoginAsAsync("admin@quotemgr.test");
+        var client = await LoginAsAsync("admin@warehouseanywhere.test");
 
         var response = await client.GetAsync("/api/requests", ct);
         response.EnsureSuccessStatusCode();
@@ -30,15 +30,15 @@ public sealed class RequestsEndpointTests : IDisposable
         page.Page.ShouldBe(1);
         page.PageSize.ShouldBe(25);
 
-        page.Items.ShouldContain(r => r.Title == "Car park resurfacing" && r.QuoteCount == 0);
-        page.Items.ShouldContain(r => r.Title == "Replace rooftop HVAC units" && r.QuoteCount == 2);
+        page.Items.ShouldContain(r => r.Title == "Cold-chain sample storage pilot — new territory launch" && r.QuoteCount == 0);
+        page.Items.ShouldContain(r => r.Title == "Regional sample storage — Southeast territory" && r.QuoteCount == 2);
     }
 
     [Fact]
     public async Task Requesting_a_page_size_over_the_cap_is_clamped_rather_than_rejected()
     {
         var ct = TestContext.Current.CancellationToken;
-        var client = await LoginAsAsync("admin@quotemgr.test");
+        var client = await LoginAsAsync("admin@warehouseanywhere.test");
 
         var response = await client.GetAsync("/api/requests?pageSize=500", ct);
         response.EnsureSuccessStatusCode();
@@ -48,41 +48,101 @@ public sealed class RequestsEndpointTests : IDisposable
     }
 
     [Fact]
-    public async Task The_hvac_request_detail_shows_both_quotes_and_the_silent_invitee()
+    public async Task Requesting_a_non_positive_page_or_page_size_is_rejected_as_a_validation_problem()
     {
         var ct = TestContext.Current.CancellationToken;
-        var client = await LoginAsAsync("reviewer@quotemgr.test");
+        var client = await LoginAsAsync("admin@warehouseanywhere.test");
 
-        var requestId = await FindRequestIdAsync("Replace rooftop HVAC units", ct);
+        var response = await client.GetAsync("/api/requests?page=0&pageSize=-5", ct);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest,
+            "clamping only makes sense for a missing value or one that's too high - an explicit non-positive value has no sensible default");
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemBody>(ct);
+        problem.ShouldNotBeNull();
+        problem.Errors.ShouldContainKey("Page");
+        problem.Errors.ShouldContainKey("PageSize");
+    }
+
+    [Fact]
+    public async Task The_sample_storage_request_detail_shows_both_quotes_and_the_silent_invitee()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var client = await LoginAsAsync("reviewer@warehouseanywhere.test");
+
+        var requestId = await FindRequestIdAsync("Regional sample storage — Southeast territory", ct);
 
         var response = await client.GetAsync($"/api/requests/{requestId}", ct);
         response.EnsureSuccessStatusCode();
         var detail = await response.Content.ReadFromJsonAsync<RequestDetailResponse>(ct);
 
         detail.ShouldNotBeNull();
-        detail.ClientOrganizationName.ShouldBe("Northwind Facilities");
+        detail.ClientOrganizationName.ShouldBe("Meridian Pharma Sampling");
         detail.Quotes.Count.ShouldBe(2);
         detail.Invitations.Count.ShouldBe(3);
 
-        // Two invitees quoted, the third (Ridgeline) never did - the exact signal AD-11 exists for.
+        // Two invitees quoted, the third (Interstate) never did - the exact signal AD-11 exists for.
         detail.Invitations.Count(i => i.HasQuoted).ShouldBe(2);
-        detail.Invitations.ShouldContain(i => i.VendorOrganizationName == "Ridgeline Electrical" && !i.HasQuoted);
+        detail.Invitations.ShouldContain(i => i.VendorOrganizationName == "Interstate Freight Partners" && !i.HasQuoted);
 
         // Both quotes are past Draft, so per AD-2's mutability rule the request itself is frozen.
         detail.IsEditable.ShouldBeFalse();
 
-        var kestrelQuote = detail.Quotes.Single(q => q.VendorOrganizationName == "Kestrel HVAC");
-        kestrelQuote.Status.ShouldBe("Submitted");
-        kestrelQuote.PermittedActions.ShouldContain("StartReview");
+        var crateworksQuote = detail.Quotes.Single(q => q.VendorOrganizationName == "Crateworks Packing & Crating");
+        crateworksQuote.Status.ShouldBe("Submitted");
+        crateworksQuote.PermittedActions.ShouldContain("StartReview");
     }
 
     [Fact]
-    public async Task The_lobby_request_is_still_editable_because_its_only_quote_is_a_draft()
+    public async Task A_vendor_viewing_a_shared_request_sees_only_its_own_quote_and_invitation()
     {
         var ct = TestContext.Current.CancellationToken;
-        var client = await LoginAsAsync("admin@quotemgr.test");
 
-        var requestId = await FindRequestIdAsync("Lobby refurbishment", ct);
+        // Crateworks (vendor2@) quoted on the sample-storage request alongside SecureBase, with
+        // Interstate invited but silent. Without AD-13's read-side filter, Crateworks could read
+        // SecureBase's amount, notes, and status straight off this response.
+        var requestId = await FindRequestIdAsync("Regional sample storage — Southeast territory", ct);
+        var client = await LoginAsAsync("vendor2@warehouseanywhere.test");
+
+        var response = await client.GetAsync($"/api/requests/{requestId}", ct);
+        response.EnsureSuccessStatusCode();
+        var detail = await response.Content.ReadFromJsonAsync<RequestDetailResponse>(ct);
+
+        detail.ShouldNotBeNull();
+        detail.Quotes.Count.ShouldBe(1, "a Vendor must not see a competitor's quote on a shared request");
+        detail.Quotes.Single().VendorOrganizationName.ShouldBe("Crateworks Packing & Crating");
+
+        detail.Invitations.Count.ShouldBe(1, "a Vendor must not see who else was invited to quote");
+        detail.Invitations.Single().VendorOrganizationName.ShouldBe("Crateworks Packing & Crating");
+        detail.Invitations.Single().HasQuoted.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task A_silent_invitee_vendor_sees_its_own_invitation_and_no_quotes_at_all()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        // Interstate (vendor3@) was invited to the sample-storage request but never quoted.
+        var requestId = await FindRequestIdAsync("Regional sample storage — Southeast territory", ct);
+        var client = await LoginAsAsync("vendor3@warehouseanywhere.test");
+
+        var response = await client.GetAsync($"/api/requests/{requestId}", ct);
+        response.EnsureSuccessStatusCode();
+        var detail = await response.Content.ReadFromJsonAsync<RequestDetailResponse>(ct);
+
+        detail.ShouldNotBeNull();
+        detail.Quotes.ShouldBeEmpty();
+        detail.Invitations.Count.ShouldBe(1);
+        detail.Invitations.Single().VendorOrganizationName.ShouldBe("Interstate Freight Partners");
+        detail.Invitations.Single().HasQuoted.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task The_pop_up_storage_request_is_still_editable_because_its_only_quote_is_a_draft()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var client = await LoginAsAsync("admin@warehouseanywhere.test");
+
+        var requestId = await FindRequestIdAsync("Pop-up retail storage & fixture staging", ct);
 
         var response = await client.GetAsync($"/api/requests/{requestId}", ct);
         var detail = await response.Content.ReadFromJsonAsync<RequestDetailResponse>(ct);
@@ -94,7 +154,7 @@ public sealed class RequestsEndpointTests : IDisposable
     public async Task An_unknown_request_id_returns_404()
     {
         var ct = TestContext.Current.CancellationToken;
-        var client = await LoginAsAsync("admin@quotemgr.test");
+        var client = await LoginAsAsync("admin@warehouseanywhere.test");
 
         var response = await client.GetAsync($"/api/requests/{Guid.NewGuid()}", ct);
 
@@ -103,7 +163,7 @@ public sealed class RequestsEndpointTests : IDisposable
 
     private async Task<Guid> FindRequestIdAsync(string title, CancellationToken ct)
     {
-        var client = await LoginAsAsync("admin@quotemgr.test");
+        var client = await LoginAsAsync("admin@warehouseanywhere.test");
         var response = await client.GetAsync("/api/requests?pageSize=100", ct);
         response.EnsureSuccessStatusCode();
         var page = await response.Content.ReadFromJsonAsync<PagedResult<RequestListItem>>(ct);
@@ -125,4 +185,8 @@ public sealed class RequestsEndpointTests : IDisposable
 
         return client;
     }
+
+    /// <summary>The shape of the 400 the built-in minimal API validation (AD-8) returns.</summary>
+    private sealed record ValidationProblemBody(Dictionary<string, string[]> Errors);
 }
+

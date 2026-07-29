@@ -7,10 +7,12 @@
 
   <!-- Application / Infrastructure -->
   <ItemGroup>
-    <PackageVersion Include="FluentValidation" Version="12.1.1" />
-    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.10" />
+    <!-- The memory configuration provider (AddInMemoryCollection) has lived in this package since
+         .NET 8; there is no separate Microsoft.Extensions.Configuration.InMemory package to add. -->
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.10" />
   </ItemGroup>
 
   <!-- Persistence -->

@@ -8,9 +8,20 @@ namespace QuoteManager.Domain.Tests;
 
 public sealed class RequestAggregateTests
 {
-    private static readonly DomainActor Reviewer = new(Guid.Parse("11111111-1111-1111-1111-111111111111"), "Rae", AppRole.Reviewer);
-    private static readonly DomainActor Vendor = new(Guid.Parse("22222222-2222-2222-2222-222222222222"), "Vic", AppRole.Vendor);
-    private static readonly DomainActor Admin = new(Guid.Parse("33333333-3333-3333-3333-333333333333"), "Ada", AppRole.Admin);
+    private static readonly Guid VendorOrgA = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+    private static readonly Guid VendorOrgB = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+
+    private static readonly DomainActor Reviewer =
+        new(Guid.Parse("11111111-1111-1111-1111-111111111111"), "Rae", AppRole.Reviewer, OrganizationId: null);
+
+    private static readonly DomainActor Vendor =
+        new(Guid.Parse("22222222-2222-2222-2222-222222222222"), "Vic", AppRole.Vendor, VendorOrgA);
+
+    private static readonly DomainActor VendorB =
+        new(Guid.Parse("44444444-4444-4444-4444-444444444444"), "Kim", AppRole.Vendor, VendorOrgB);
+
+    private static readonly DomainActor Admin =
+        new(Guid.Parse("33333333-3333-3333-3333-333333333333"), "Ada", AppRole.Admin, OrganizationId: null);
 
     private readonly FakeTimeProvider _clock = new(new DateTimeOffset(2026, 7, 28, 12, 0, 0, TimeSpan.Zero));
 
@@ -28,9 +39,9 @@ public sealed class RequestAggregateTests
     public void Accepting_a_quote_rejects_the_live_siblings_and_awards_the_request()
     {
         var request = NewRequest();
-        var winner = SubmitAndReview(request, 1000m);
-        var contender = Submit(request, 1200m);
-        var draft = request.AddQuote(Guid.NewGuid(), new Money(900m, "USD"), null, null, Vendor, Now);
+        var winner = SubmitAndReview(request, 1000m, Vendor);
+        var contender = Submit(request, 1200m, VendorB);
+        var draft = request.AddQuote(VendorOrgA, new Money(900m, "USD"), null, null, Vendor, Now);
 
         request.ApplyQuoteAction(winner.Id, QuoteAction.Accept, Reviewer, Now);
 
@@ -49,8 +60,8 @@ public sealed class RequestAggregateTests
     public void A_second_acceptance_is_refused_with_the_stable_already_accepted_code()
     {
         var request = NewRequest();
-        var first = SubmitAndReview(request, 1000m);
-        var second = Submit(request, 1200m);
+        var first = SubmitAndReview(request, 1000m, Vendor);
+        var second = Submit(request, 1200m, VendorB);
 
         request.ApplyQuoteAction(first.Id, QuoteAction.Accept, Reviewer, Now);
 
@@ -67,7 +78,9 @@ public sealed class RequestAggregateTests
     public void Accepting_never_leaves_more_than_one_accepted_quote_however_many_compete()
     {
         var request = NewRequest();
-        var quotes = Enumerable.Range(0, 5).Select(i => SubmitAndReview(request, 1000m + i)).ToArray();
+        var quotes = Enumerable.Range(0, 5)
+            .Select(i => SubmitAndReview(request, 1000m + i, ActorForOrg(Guid.CreateVersion7())))
+            .ToArray();
 
         request.ApplyQuoteAction(quotes[2].Id, QuoteAction.Accept, Reviewer, Now);
 
@@ -79,7 +92,7 @@ public sealed class RequestAggregateTests
     public void A_vendor_is_refused_when_accepting_and_the_state_is_left_untouched()
     {
         var request = NewRequest();
-        var quote = SubmitAndReview(request, 1000m);
+        var quote = SubmitAndReview(request, 1000m, Vendor);
 
         Should.Throw<QuoteTransitionNotAllowedException>(() =>
                 request.ApplyQuoteAction(quote.Id, QuoteAction.Accept, Vendor, Now))
@@ -90,10 +103,35 @@ public sealed class RequestAggregateTests
     }
 
     [Fact]
+    public void A_vendor_cannot_withdraw_another_vendors_quote()
+    {
+        var request = NewRequest();
+        var quote = Submit(request, 1000m, Vendor);
+
+        Should.Throw<QuoteTransitionNotAllowedException>(() =>
+                request.ApplyQuoteAction(quote.Id, QuoteAction.Withdraw, VendorB, Now))
+            .BlockedByRole.ShouldBeTrue();
+
+        quote.Status.ShouldBe(QuoteStatus.Submitted);
+    }
+
+    [Fact]
+    public void A_vendor_cannot_draft_a_quote_under_another_vendors_organisation()
+    {
+        var request = NewRequest();
+
+        Should.Throw<QuoteTransitionNotAllowedException>(() =>
+                request.AddQuote(VendorOrgB, new Money(1000m, "USD"), null, null, Vendor, Now))
+            .BlockedByRole.ShouldBeTrue();
+
+        request.Quotes.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void A_quote_cannot_be_edited_once_submitted()
     {
         var request = NewRequest();
-        var quote = Submit(request, 1000m);
+        var quote = Submit(request, 1000m, Vendor);
 
         Should.Throw<QuoteTransitionNotAllowedException>(() =>
             request.EditQuote(quote.Id, new Money(1m, "USD"), null, null, Vendor, Now));
@@ -105,7 +143,7 @@ public sealed class RequestAggregateTests
     public void A_draft_quote_can_be_edited_by_its_vendor()
     {
         var request = NewRequest();
-        var quote = request.AddQuote(Guid.NewGuid(), new Money(1000m, "USD"), null, null, Vendor, Now);
+        var quote = request.AddQuote(VendorOrgA, new Money(1000m, "USD"), null, null, Vendor, Now);
 
         request.EditQuote(quote.Id, new Money(950.005m, "USD"), null, "Sharpened pencil", Vendor, Now);
 
@@ -117,7 +155,7 @@ public sealed class RequestAggregateTests
     public void A_stale_expected_version_is_refused_before_any_state_changes()
     {
         var request = NewRequest();
-        var quote = Submit(request, 1000m);
+        var quote = Submit(request, 1000m, Vendor);
         var staleVersion = quote.Version - 1;
 
         Should.Throw<QuoteConcurrencyException>(() =>
@@ -131,7 +169,7 @@ public sealed class RequestAggregateTests
     public void A_matching_expected_version_is_accepted()
     {
         var request = NewRequest();
-        var quote = Submit(request, 1000m);
+        var quote = Submit(request, 1000m, Vendor);
 
         request.ApplyQuoteAction(quote.Id, QuoteAction.StartReview, Reviewer, Now, quote.Version);
 
@@ -154,7 +192,7 @@ public sealed class RequestAggregateTests
         var request = NewRequest();
         request.IsEditable.ShouldBeTrue();
 
-        var quote = request.AddQuote(Guid.NewGuid(), new Money(1000m, "USD"), null, null, Vendor, Now);
+        var quote = request.AddQuote(VendorOrgA, new Money(1000m, "USD"), null, null, Vendor, Now);
         request.IsEditable.ShouldBeTrue("a draft nobody has committed to does not lock the scope");
 
         request.ApplyQuoteAction(quote.Id, QuoteAction.Submit, Vendor, Now);
@@ -168,18 +206,18 @@ public sealed class RequestAggregateTests
     public void Quotes_cannot_be_added_to_an_awarded_request()
     {
         var request = NewRequest();
-        var quote = SubmitAndReview(request, 1000m);
+        var quote = SubmitAndReview(request, 1000m, Vendor);
         request.ApplyQuoteAction(quote.Id, QuoteAction.Accept, Reviewer, Now);
 
         Should.Throw<RequestNotEditableException>(() =>
-            request.AddQuote(Guid.NewGuid(), new Money(1m, "USD"), null, null, Vendor, Now));
+            request.AddQuote(VendorOrgB, new Money(1m, "USD"), null, null, VendorB, Now));
     }
 
     [Fact]
     public void An_awarded_request_cannot_be_cancelled()
     {
         var request = NewRequest();
-        var quote = SubmitAndReview(request, 1000m);
+        var quote = SubmitAndReview(request, 1000m, Vendor);
         request.ApplyQuoteAction(quote.Id, QuoteAction.Accept, Reviewer, Now);
 
         Should.Throw<RequestNotEditableException>(() => request.Cancel(Admin, Now));
@@ -189,8 +227,8 @@ public sealed class RequestAggregateTests
     public void Every_state_change_raises_an_event_so_the_audit_trail_cannot_be_bypassed()
     {
         var request = NewRequest();
-        var winner = SubmitAndReview(request, 1000m);
-        Submit(request, 1200m);
+        var winner = SubmitAndReview(request, 1000m, Vendor);
+        Submit(request, 1200m, VendorB);
         request.ApplyQuoteAction(winner.Id, QuoteAction.Accept, Reviewer, Now);
 
         var events = request.DomainEvents;
@@ -209,8 +247,8 @@ public sealed class RequestAggregateTests
     public void Invited_vendors_who_have_not_quoted_are_the_signal_the_dashboard_needs()
     {
         var request = NewRequest();
-        var responded = Guid.CreateVersion7();
-        var silent = Guid.CreateVersion7();
+        var responded = VendorOrgA;
+        var silent = VendorOrgB;
 
         request.InviteVendor(responded, Admin, Now);
         request.InviteVendor(silent, Admin, Now);
@@ -239,11 +277,29 @@ public sealed class RequestAggregateTests
     public void Vendors_cannot_be_invited_to_an_awarded_request()
     {
         var request = NewRequest();
-        var quote = SubmitAndReview(request, 1000m);
+        var quote = SubmitAndReview(request, 1000m, Vendor);
         request.ApplyQuoteAction(quote.Id, QuoteAction.Accept, Reviewer, Now);
 
         Should.Throw<RequestNotEditableException>(() =>
             request.InviteVendor(Guid.CreateVersion7(), Admin, Now));
+    }
+
+    [Fact]
+    public void A_vendor_cannot_raise_a_request_on_behalf_of_a_client()
+    {
+        Should.Throw<RequestCreationNotPermittedException>(() =>
+                Request.Create("Storage for Q4", null, Guid.NewGuid(), null, Vendor, Now))
+            .Code.ShouldBe("request.creation_not_permitted");
+    }
+
+    [Fact]
+    public void A_reviewer_cannot_raise_a_request_either()
+    {
+        // Reviewer moves quotes through review and decides the outcome; raising the request in
+        // the first place belongs to Requester/Admin, so this is not a role that happens to be
+        // adjacent - it is explicitly outside the gate.
+        Should.Throw<RequestCreationNotPermittedException>(() =>
+            Request.Create("Storage for Q4", null, Guid.NewGuid(), null, Reviewer, Now));
     }
 
     [Fact]
@@ -276,21 +332,27 @@ public sealed class RequestAggregateTests
         return milliseconds;
     }
 
+    private static DomainActor ActorForOrg(Guid organizationId) =>
+        new(Guid.CreateVersion7(), "Vendor", AppRole.Vendor, organizationId);
+
     private DateTimeOffset Now => _clock.GetUtcNow();
 
     private Request NewRequest() =>
         Request.Create("Replace the HVAC units", "Two rooftop units", Guid.NewGuid(), null, Admin, Now);
 
-    private Quote Submit(Request request, decimal amount)
+    private Quote Submit(Request request, decimal amount, DomainActor vendor)
     {
-        var quote = request.AddQuote(Guid.NewGuid(), new Money(amount, "USD"), null, null, Vendor, Now);
-        request.ApplyQuoteAction(quote.Id, QuoteAction.Submit, Vendor, Now);
+        var organizationId = vendor.OrganizationId
+            ?? throw new InvalidOperationException("Submit helper requires a vendor with an organisation.");
+
+        var quote = request.AddQuote(organizationId, new Money(amount, "USD"), null, null, vendor, Now);
+        request.ApplyQuoteAction(quote.Id, QuoteAction.Submit, vendor, Now);
         return quote;
     }
 
-    private Quote SubmitAndReview(Request request, decimal amount)
+    private Quote SubmitAndReview(Request request, decimal amount, DomainActor vendor)
     {
-        var quote = Submit(request, amount);
+        var quote = Submit(request, amount, vendor);
         request.ApplyQuoteAction(quote.Id, QuoteAction.StartReview, Reviewer, Now);
         return quote;
     }

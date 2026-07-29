@@ -97,6 +97,15 @@ public sealed class Request : AggregateRoot
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
+        // Mirrors AD-13's vendor-ownership gate on AddQuote: this is the client side of the same
+        // problem. A Vendor or Reviewer account raising a request is not a harmless no-op, it is
+        // one organisation's staff fabricating a request on behalf of a client they do not
+        // represent - checked here, once, rather than trusted to every future caller.
+        if (!actor.Roles.HasAny(AppRole.Requester | AppRole.Admin))
+        {
+            throw new RequestCreationNotPermittedException();
+        }
+
         return new Request(
             Guid.CreateVersion7(now),
             title.Trim(),
@@ -173,6 +182,17 @@ public sealed class Request : AggregateRoot
         {
             throw new RequestNotEditableException(
                 $"Quotes cannot be added to a request in state '{Status}'.");
+        }
+
+        // AD-13: creating a quote is the other vendor-owned gate. Checking here, not only on
+        // transitions, means a Vendor cannot plant a draft under a competitor's organisation and
+        // then leave it for that competitor to discover.
+        if (!actor.CanActForVendorOrganization(vendorOrganizationId))
+        {
+            throw new QuoteTransitionNotAllowedException(
+                new QuoteStatusName(QuoteStatus.Draft.ToString()),
+                "Create",
+                blockedByRole: true);
         }
 
         var quote = Quote.Draft(Id, vendorOrganizationId, amount, expiresAt, notes, now);
@@ -294,7 +314,7 @@ public sealed class Request : AggregateRoot
             throw new QuoteConcurrencyException(quote.Id, expected, quote.Version);
         }
 
-        var resolution = QuoteTransitions.Resolve(quote.Status, action, actor.Roles);
+        var resolution = QuoteTransitions.Resolve(quote.Status, action, actor, quote.VendorOrganizationId);
 
         return resolution.IsAllowed
             ? resolution.Resulting

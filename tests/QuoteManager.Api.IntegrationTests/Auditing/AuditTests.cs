@@ -68,12 +68,13 @@ public sealed class AuditTests : IDisposable
     public async Task A_transition_made_through_the_api_is_audited_with_the_authenticated_actor()
     {
         var ct = TestContext.Current.CancellationToken;
-        var (requestId, quoteId) = await FindQuoteAsync("Replace rooftop HVAC units", "vendor2@quotemgr.test");
+        var (requestId, quoteId) = await FindQuoteAsync(
+            "Regional sample storage — Southeast territory", "vendor2@warehouseanywhere.test");
 
         var client = _factory.CreateClient();
         var login = await client.PostAsJsonAsync(
             "/api/auth/login",
-            new { email = "reviewer@quotemgr.test", password = QuoteManager.Infrastructure.Persistence.DemoDataSeeder.DemoPassword },
+            new { email = "reviewer@warehouseanywhere.test", password = QuoteManager.Infrastructure.Persistence.DemoDataSeeder.DemoPassword },
             ct);
         login.EnsureSuccessStatusCode();
         var loginBody = await login.Content.ReadFromJsonAsync<LoginResponse>(ct);

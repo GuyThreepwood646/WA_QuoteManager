@@ -15,9 +15,9 @@ public readonly record struct Money
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(currencyCode);
 
-        if (amount < 0)
+        if (amount <= 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(amount), amount, "A quoted amount cannot be negative.");
+            throw new ArgumentOutOfRangeException(nameof(amount), amount, "A quoted amount must be greater than zero.");
         }
 
         if (currencyCode.Length != 3)

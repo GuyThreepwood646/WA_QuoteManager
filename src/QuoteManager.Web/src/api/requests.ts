@@ -1,5 +1,13 @@
 import { apiClient } from './apiClient'
-import type { PagedResult, RequestDetailResponse, RequestListItem, RequestQuoteItem } from './types'
+import type {
+  ActivityEntryItem,
+  CreateQuoteInput,
+  CreateRequestInput,
+  PagedResult,
+  RequestDetailResponse,
+  RequestListItem,
+  RequestQuoteItem,
+} from './types'
 
 export function listRequests(pageSize = 100): Promise<PagedResult<RequestListItem>> {
   return apiClient.get<PagedResult<RequestListItem>>(`/api/requests?pageSize=${pageSize}`)
@@ -7,6 +15,21 @@ export function listRequests(pageSize = 100): Promise<PagedResult<RequestListIte
 
 export function getRequest(requestId: string): Promise<RequestDetailResponse> {
   return apiClient.get<RequestDetailResponse>(`/api/requests/${requestId}`)
+}
+
+/** FR-4/FR-5: the audit trail, projected as a per-request timeline rather than a raw log dump. */
+export function getRequestActivity(requestId: string): Promise<PagedResult<ActivityEntryItem>> {
+  return apiClient.get<PagedResult<ActivityEntryItem>>(`/api/requests/${requestId}/activity?pageSize=100`)
+}
+
+/** FR-1: raising a request. The API is the sole authority on whether the caller's role permits it. */
+export function createRequest(input: CreateRequestInput): Promise<RequestDetailResponse> {
+  return apiClient.post<RequestDetailResponse>('/api/requests', input)
+}
+
+/** FR-1's vendor side: drafting a quote against a request. */
+export function createQuote(requestId: string, input: CreateQuoteInput): Promise<RequestQuoteItem> {
+  return apiClient.post<RequestQuoteItem>(`/api/requests/${requestId}/quotes`, input)
 }
 
 /**

@@ -3,6 +3,8 @@ import { ArrowLeft } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 
 import { getRequest } from '@/api/requests'
+import { ActivityTimeline } from '@/components/activity-timeline'
+import { AddQuoteForm } from '@/components/add-quote-form'
 import { QuoteCard } from '@/components/quote-card'
 import { StatusBadge } from '@/components/status-badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -67,6 +69,13 @@ export function RequestDetailPage() {
           </p>
         </div>
       )}
+
+      {data.canAddQuote && <AddQuoteForm requestId={data.id} />}
+
+      <div className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold">Activity</h2>
+        <ActivityTimeline requestId={data.id} />
+      </div>
     </div>
   )
 }

@@ -46,6 +46,12 @@ public sealed class RequestNotEditableException(string reason)
     public override string Code => "request.not_editable";
 }
 
+public sealed class RequestCreationNotPermittedException()
+    : DomainException("The current user's roles do not permit creating a request.")
+{
+    public override string Code => "request.creation_not_permitted";
+}
+
 public sealed class QuoteConcurrencyException(Guid quoteId, int expectedVersion, int actualVersion)
     : DomainException(
         $"Quote '{quoteId}' has changed since it was read (expected version {expectedVersion}, found {actualVersion}).")

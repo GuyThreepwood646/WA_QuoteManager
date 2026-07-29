@@ -55,7 +55,7 @@ public static class DashboardEndpoints
         CancellationToken cancellationToken)
     {
         var now = timeProvider.GetUtcNow();
-        var roles = currentUser.Roles;
+        var actor = currentUser.ToActor();
 
         // AD-11: one AsNoTracking projection joining Quotes/Requests/Organizations by id (there is
         // no navigation property between them - see AD-3's note on why Quote carries no
@@ -85,7 +85,9 @@ public static class DashboardEndpoints
                 row.Quote.ExpiresAt,
                 row.Quote.StatusChangedAt,
                 row.Quote.Version,
-                QuoteTransitions.PermittedFor(row.Quote.Status, roles).Select(a => a.ToString()).ToList()))
+                QuoteTransitions.PermittedFor(row.Quote.Status, actor, row.Quote.VendorOrganizationId)
+                    .Select(a => a.ToString())
+                    .ToList()))
             .ToList();
 
         var expiryThreshold = now.Add(ExpirySoonWindow);

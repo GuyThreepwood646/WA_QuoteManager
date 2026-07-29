@@ -9,5 +9,6 @@
     <Project Path="tests/QuoteManager.Api.IntegrationTests/QuoteManager.Api.IntegrationTests.csproj" />
     <Project Path="tests/QuoteManager.Architecture.Tests/QuoteManager.Architecture.Tests.csproj" />
     <Project Path="tests/QuoteManager.Domain.Tests/QuoteManager.Domain.Tests.csproj" />
+    <Project Path="tests/QuoteManager.Infrastructure.Tests/QuoteManager.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

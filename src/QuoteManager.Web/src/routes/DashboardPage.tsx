@@ -53,7 +53,7 @@ export function DashboardPage() {
       </Section>
 
       <Section
-        title="Awaiting vendor response"
+        title="Awaiting partner response"
         icon={<AlertTriangle className="size-4" />}
         count={data.requestsAwaitingResponse.length}
       >

@@ -7,7 +7,6 @@
   <!-- AD-1: no Microsoft.EntityFrameworkCore.*, Microsoft.AspNetCore.* or Azure.* here.
        Only abstractions the use cases genuinely need to declare their ports and be wired up. -->
   <ItemGroup>
-    <PackageReference Include="FluentValidation" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>

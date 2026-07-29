@@ -90,7 +90,7 @@ public sealed class DemoSeedTests : IAsyncLifetime
         // The README publishes this password. If hashing and verification disagree, the demo stops
         // at the login screen.
         var user = await _context.Users.AsNoTracking()
-            .SingleAsync(u => u.Email == "admin@quotemgr.test", TestContext.Current.CancellationToken);
+            .SingleAsync(u => u.Email == "admin@warehouseanywhere.test", TestContext.Current.CancellationToken);
 
         var result = new PasswordHasher<AppUser>()
             .VerifyHashedPassword(user, user.PasswordHash, DemoDataSeeder.DemoPassword);

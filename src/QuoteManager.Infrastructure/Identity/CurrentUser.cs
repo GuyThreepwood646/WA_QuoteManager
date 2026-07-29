@@ -41,7 +41,7 @@ public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICur
         }
     }
 
-    public DomainActor ToActor() => new(UserId, DisplayName, Roles);
+    public DomainActor ToActor() => new(UserId, DisplayName, Roles, OrganizationId);
 
     private string RequireClaim(string type) =>
         Principal?.FindFirst(type)?.Value

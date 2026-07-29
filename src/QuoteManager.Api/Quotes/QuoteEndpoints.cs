@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Net.Http.Headers;
+using QuoteManager.Api.Models;
 using QuoteManager.Application.Abstractions;
+using QuoteManager.Domain.Common;
 using QuoteManager.Domain.Identity;
 using QuoteManager.Domain.Quotes;
 using QuoteManager.Infrastructure.Persistence;
@@ -22,12 +24,15 @@ public sealed record QuoteResponse(
     int Version,
     IReadOnlyList<string> PermittedActions);
 
-public sealed record ApplyQuoteActionRequest(QuoteAction Action);
-
 public static class QuoteEndpoints
 {
     public static void MapQuoteEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        // FR-1's vendor side: drafting a quote against a request. Same rule as the transition
+        // endpoint below - Request.AddQuote's CanActForVendorOrganization check (AD-13) is the
+        // sole authority on whether this caller may draft under the named vendor organisation.
+        endpoints.MapPost("/api/requests/{requestId:guid}/quotes", CreateQuoteAsync);
+
         var group = endpoints.MapGroup("/api/requests/{requestId:guid}/quotes/{quoteId:guid}");
 
         // AD-15: reads carry a weak ETag so a client can round-trip it as If-Match.
@@ -37,6 +42,48 @@ public static class QuoteEndpoints
         // anywhere near it - QuoteTransitions.Resolve, called inside ApplyQuoteAction, is the only
         // authority on whether the actor's roles permit this action.
         group.MapPost("/transitions", ApplyActionAsync);
+    }
+
+    private static async Task<IResult> CreateQuoteAsync(
+        Guid requestId,
+        CreateQuoteRequest body,
+        HttpContext httpContext,
+        QuoteManagerDbContext db,
+        ICurrentUser currentUser,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        var request = await db.Requests.FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+        if (request is null)
+        {
+            return Results.NotFound();
+        }
+
+        // Throws RequestNotEditableException (request already awarded/cancelled) or
+        // QuoteTransitionNotAllowedException (wrong vendor organisation) - both are mapped by the
+        // DomainExceptionHandler (AD-8), so no try/catch belongs here.
+        var quote = request.AddQuote(
+            body.VendorOrganizationId,
+            new Money(body.Amount, body.Currency),
+            body.ExpiresAt,
+            body.Notes,
+            currentUser.ToActor(),
+            timeProvider.GetUtcNow());
+
+        // request was loaded, not context.Add()-ed, so EF's change tracker has no signal that a
+        // brand-new child reached via AddQuote's navigation mutation is Added rather than an
+        // already-existing row - its key is already set (UUIDv7, assigned in the constructor), so
+        // without this it is tracked as Modified and SaveChanges issues an UPDATE that matches zero
+        // rows. Explicit, not a workaround: every future write path that grows a tracked aggregate's
+        // child collection needs the same line.
+        db.Quotes.Add(quote);
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        SetETag(httpContext, quote.Version);
+        return Results.Created(
+            $"/api/requests/{requestId}/quotes/{quote.Id}",
+            ToResponse(quote, currentUser.ToActor()));
     }
 
     private static async Task<IResult> GetQuoteAsync(
@@ -57,7 +104,7 @@ public static class QuoteEndpoints
         }
 
         SetETag(httpContext, quote.Version);
-        return Results.Ok(ToResponse(quote, currentUser.Roles));
+        return Results.Ok(ToResponse(quote, currentUser.ToActor()));
     }
 
     private static async Task<IResult> ApplyActionAsync(
@@ -94,7 +141,7 @@ public static class QuoteEndpoints
 
         var quote = request.Quotes.First(q => q.Id == quoteId);
         SetETag(httpContext, quote.Version);
-        return Results.Ok(ToResponse(quote, currentUser.Roles));
+        return Results.Ok(ToResponse(quote, currentUser.ToActor()));
     }
 
     private static bool TryReadIfMatchVersion(HttpRequest request, out int version)
@@ -114,7 +161,7 @@ public static class QuoteEndpoints
     private static void SetETag(HttpContext httpContext, int version) =>
         httpContext.Response.GetTypedHeaders().ETag = new EntityTagHeaderValue($"\"{version}\"", isWeak: true);
 
-    private static QuoteResponse ToResponse(Quote quote, AppRole actorRoles) => new(
+    private static QuoteResponse ToResponse(Quote quote, DomainActor actor) => new(
         quote.Id,
         quote.RequestId,
         quote.VendorOrganizationId,
@@ -127,5 +174,7 @@ public static class QuoteEndpoints
         quote.StatusChangedAt,
         quote.StatusReason,
         quote.Version,
-        QuoteTransitions.PermittedFor(quote.Status, actorRoles).Select(action => action.ToString()).ToList());
+        QuoteTransitions.PermittedFor(quote.Status, actor, quote.VendorOrganizationId)
+            .Select(action => action.ToString())
+            .ToList());
 }

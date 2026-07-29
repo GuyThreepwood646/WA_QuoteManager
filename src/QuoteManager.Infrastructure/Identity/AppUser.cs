@@ -28,5 +28,5 @@ public sealed class AppUser
     /// </summary>
     public Guid? OrganizationId { get; init; }
 
-    public DomainActor ToActor() => new(Id, DisplayName, Roles);
+    public DomainActor ToActor() => new(Id, DisplayName, Roles, OrganizationId);
 }

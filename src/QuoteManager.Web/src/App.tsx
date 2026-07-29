@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from './auth/AuthProvider'
 import { DashboardPage } from './routes/DashboardPage'
 import { LoginPage } from './routes/LoginPage'
+import { NewRequestPage } from './routes/NewRequestPage'
 import { OrganizationsPage } from './routes/OrganizationsPage'
 import { RequestDetailPage } from './routes/RequestDetailPage'
 import { RequestsListPage } from './routes/RequestsListPage'
@@ -62,7 +63,7 @@ function Shell() {
     <div className="flex h-screen bg-background text-foreground">
       <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground">
         <div className="flex h-14 items-center px-5">
-          <span className="text-sm font-semibold tracking-tight">Quote Manager</span>
+          <span className="text-sm font-semibold tracking-tight">Warehouse Anywhere</span>
         </div>
         <Separator className="bg-sidebar-border" />
         <nav className="flex flex-1 flex-col gap-1 p-3">
@@ -88,7 +89,7 @@ function Shell() {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-6">
-          <span className="text-sm text-muted-foreground">Service requests and quotes</span>
+          <span className="text-sm text-muted-foreground">Storage, packing & transportation requests</span>
           <div className="flex items-center gap-3">
             <span className="text-sm font-medium">{session?.user.displayName}</span>
             <Button variant="ghost" size="sm" onClick={logout}>
@@ -103,6 +104,7 @@ function Shell() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/requests" element={<RequestsListPage />} />
+            <Route path="/requests/new" element={<NewRequestPage />} />
             <Route path="/requests/:requestId" element={<RequestDetailPage />} />
             <Route path="/organizations" element={<OrganizationsPage />} />
           </Routes>

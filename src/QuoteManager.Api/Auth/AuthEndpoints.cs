@@ -1,13 +1,12 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using QuoteManager.Api.Models;
 using QuoteManager.Application.Abstractions;
 using QuoteManager.Domain.Identity;
 using QuoteManager.Infrastructure.Identity;
 using QuoteManager.Infrastructure.Persistence;
 
 namespace QuoteManager.Api.Auth;
-
-public sealed record LoginRequest(string Email, string Password);
 
 public sealed record CurrentUserResponse(Guid Id, string DisplayName, IReadOnlyList<string> Roles, Guid? OrganizationId);
 

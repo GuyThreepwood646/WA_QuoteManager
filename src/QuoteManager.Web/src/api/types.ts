@@ -76,6 +76,7 @@ export interface RequestDetailResponse {
   neededBy: string | null
   createdAt: string
   isEditable: boolean
+  canAddQuote: boolean
   quotes: RequestQuoteItem[]
   invitations: RequestInvitationItem[]
 }
@@ -84,4 +85,29 @@ export interface OrganizationListItem {
   id: string
   name: string
   kind: string
+}
+
+export interface CreateRequestInput {
+  title: string
+  description?: string
+  clientOrganizationId: string
+  neededBy?: string
+}
+
+export interface ActivityEntryItem {
+  id: string
+  subjectType: string
+  subjectId: string
+  action: string
+  summary: string
+  actorDisplayName: string
+  occurredAt: string
+}
+
+export interface CreateQuoteInput {
+  vendorOrganizationId: string
+  amount: number
+  currency: string
+  expiresAt?: string
+  notes?: string
 }

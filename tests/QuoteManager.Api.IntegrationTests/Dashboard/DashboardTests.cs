@@ -22,38 +22,42 @@ public sealed class DashboardTests : IDisposable
     public async Task The_dashboard_buckets_match_the_seeded_demo_data()
     {
         var ct = TestContext.Current.CancellationToken;
-        var client = await LoginAsAsync("reviewer@quotemgr.test");
+        var client = await LoginAsAsync("reviewer@warehouseanywhere.test");
 
         var response = await client.GetAsync("/api/dashboard", ct);
         response.EnsureSuccessStatusCode();
         var dashboard = await response.Content.ReadFromJsonAsync<DashboardResponse>(ct);
         dashboard.ShouldNotBeNull();
 
-        // Submitted, waiting for a reviewer to start looking: hvac's Kestrel quote and the
-        // near-expiry generator quote. hvac's Bolt quote is already UnderReview, not here.
-        dashboard.QuotesNeedingReview.ShouldContain(q => q.RequestTitle == "Replace rooftop HVAC units" && q.VendorOrganizationName == "Kestrel HVAC");
-        dashboard.QuotesNeedingReview.ShouldContain(q => q.RequestTitle == "Emergency generator servicing");
+        // Submitted, waiting for a reviewer to start looking: the sample-storage request's
+        // Crateworks quote and the near-expiry overflow-storage quote. The sample-storage request's
+        // SecureBase quote is already UnderReview, not here.
+        dashboard.QuotesNeedingReview.ShouldContain(q =>
+            q.RequestTitle == "Regional sample storage — Southeast territory" && q.VendorOrganizationName == "Crateworks Packing & Crating");
+        dashboard.QuotesNeedingReview.ShouldContain(q => q.RequestTitle == "Overflow inventory storage — holiday peak season");
         dashboard.QuotesNeedingReview.ShouldAllBe(q => q.Status == "Submitted");
 
-        // Being actively reviewed: only hvac's Bolt quote in the whole seed.
+        // Being actively reviewed: only the sample-storage request's SecureBase quote in the whole seed.
         dashboard.QuotesUnderReview.ShouldHaveSingleItem();
-        dashboard.QuotesUnderReview[0].RequestTitle.ShouldBe("Replace rooftop HVAC units");
-        dashboard.QuotesUnderReview[0].VendorOrganizationName.ShouldBe("Bolt Mechanical");
+        dashboard.QuotesUnderReview[0].RequestTitle.ShouldBe("Regional sample storage — Southeast territory");
+        dashboard.QuotesUnderReview[0].VendorOrganizationName.ShouldBe("SecureBase Self Storage");
         dashboard.QuotesUnderReview[0].PermittedActions.ShouldContain("Accept");
 
-        // Expiring inside the 3-day window: only the generator quote (2 days out). hvac's two
-        // quotes expire in 14 and 20 days and must not show up here just because they are active.
+        // Expiring inside the 3-day window: only the overflow-storage quote (2 days out). The
+        // sample-storage request's two quotes expire in 14 and 20 days and must not show up here
+        // just because they are active.
         dashboard.QuotesExpiringSoon.ShouldHaveSingleItem();
-        dashboard.QuotesExpiringSoon[0].RequestTitle.ShouldBe("Emergency generator servicing");
+        dashboard.QuotesExpiringSoon[0].RequestTitle.ShouldBe("Overflow inventory storage — holiday peak season");
 
-        // Silence the invitation list exists to surface: hvac has one invited vendor (Ridgeline)
-        // who never quoted, and car park has three invited vendors and zero quotes at all.
-        // electrical also has invitations but every invitee quoted, and it is Awarded besides.
+        // Silence the invitation list exists to surface: sample storage has one invited partner
+        // (Interstate) who never quoted, and the cold-chain pilot has three invited partners and
+        // zero quotes at all. The trade show request also has invitations but every invitee
+        // quoted, and it is Awarded besides.
         dashboard.RequestsAwaitingResponse.ShouldContain(r =>
-            r.Title == "Replace rooftop HVAC units" && r.AwaitingVendorNames.ShouldHaveSingleItem() == "Ridgeline Electrical");
-        var carPark = dashboard.RequestsAwaitingResponse.Single(r => r.Title == "Car park resurfacing");
-        carPark.AwaitingVendorNames.Count.ShouldBe(3);
-        dashboard.RequestsAwaitingResponse.ShouldNotContain(r => r.Title == "Annual electrical safety inspection");
+            r.Title == "Regional sample storage — Southeast territory" && r.AwaitingVendorNames.ShouldHaveSingleItem() == "Interstate Freight Partners");
+        var coldChainPilot = dashboard.RequestsAwaitingResponse.Single(r => r.Title == "Cold-chain sample storage pilot — new territory launch");
+        coldChainPilot.AwaitingVendorNames.Count.ShouldBe(3);
+        dashboard.RequestsAwaitingResponse.ShouldNotContain(r => r.Title == "Trade show fixture storage & drayage — West Coast expo season");
     }
 
     private async Task<HttpClient> LoginAsAsync(string email)

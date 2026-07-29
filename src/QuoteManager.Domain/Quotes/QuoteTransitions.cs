@@ -5,11 +5,18 @@ namespace QuoteManager.Domain.Quotes;
 /// <summary>
 /// One legal move: from a state, by an action, to a state, permitted to a set of roles.
 /// </summary>
+/// <remarks>
+/// <paramref name="IsVendorGated"/> marks rows whose <see cref="PermittedRoles"/> is the Vendor
+/// side of the table: AD-13 says a Vendor may act only on its own organisation's quotes, and a
+/// role check alone cannot express "this vendor, not any vendor" - so these rows carry an extra
+/// organisation-matching requirement that Reviewer/Admin-only rows do not.
+/// </remarks>
 public sealed record QuoteTransition(
     QuoteStatus From,
     QuoteAction Action,
     QuoteStatus To,
-    AppRole PermittedRoles);
+    AppRole PermittedRoles,
+    bool IsVendorGated);
 
 /// <summary>
 /// The single authority on the quote lifecycle, per AD-2.
@@ -27,18 +34,18 @@ public static class QuoteTransitions
 
     private static readonly QuoteTransition[] Table =
     [
-        new(QuoteStatus.Draft, QuoteAction.Submit, QuoteStatus.Submitted, VendorSide),
-        new(QuoteStatus.Draft, QuoteAction.Edit, QuoteStatus.Draft, VendorSide),
-        new(QuoteStatus.Draft, QuoteAction.Withdraw, QuoteStatus.Withdrawn, VendorSide),
+        new(QuoteStatus.Draft, QuoteAction.Submit, QuoteStatus.Submitted, VendorSide, IsVendorGated: true),
+        new(QuoteStatus.Draft, QuoteAction.Edit, QuoteStatus.Draft, VendorSide, IsVendorGated: true),
+        new(QuoteStatus.Draft, QuoteAction.Withdraw, QuoteStatus.Withdrawn, VendorSide, IsVendorGated: true),
 
-        new(QuoteStatus.Submitted, QuoteAction.StartReview, QuoteStatus.UnderReview, ReviewerSide),
-        new(QuoteStatus.Submitted, QuoteAction.Withdraw, QuoteStatus.Withdrawn, VendorSide),
-        new(QuoteStatus.Submitted, QuoteAction.Expire, QuoteStatus.Expired, AppRole.Admin),
+        new(QuoteStatus.Submitted, QuoteAction.StartReview, QuoteStatus.UnderReview, ReviewerSide, IsVendorGated: false),
+        new(QuoteStatus.Submitted, QuoteAction.Withdraw, QuoteStatus.Withdrawn, VendorSide, IsVendorGated: true),
+        new(QuoteStatus.Submitted, QuoteAction.Expire, QuoteStatus.Expired, AppRole.Admin, IsVendorGated: false),
 
-        new(QuoteStatus.UnderReview, QuoteAction.Accept, QuoteStatus.Accepted, ReviewerSide),
-        new(QuoteStatus.UnderReview, QuoteAction.Reject, QuoteStatus.Rejected, ReviewerSide),
-        new(QuoteStatus.UnderReview, QuoteAction.ReturnToSubmitted, QuoteStatus.Submitted, ReviewerSide),
-        new(QuoteStatus.UnderReview, QuoteAction.Expire, QuoteStatus.Expired, AppRole.Admin),
+        new(QuoteStatus.UnderReview, QuoteAction.Accept, QuoteStatus.Accepted, ReviewerSide, IsVendorGated: false),
+        new(QuoteStatus.UnderReview, QuoteAction.Reject, QuoteStatus.Rejected, ReviewerSide, IsVendorGated: false),
+        new(QuoteStatus.UnderReview, QuoteAction.ReturnToSubmitted, QuoteStatus.Submitted, ReviewerSide, IsVendorGated: false),
+        new(QuoteStatus.UnderReview, QuoteAction.Expire, QuoteStatus.Expired, AppRole.Admin, IsVendorGated: false),
     ];
 
     public static IReadOnlyList<QuoteTransition> All => Table;
@@ -50,15 +57,16 @@ public static class QuoteTransitions
         status is QuoteStatus.Accepted or QuoteStatus.Rejected or QuoteStatus.Withdrawn or QuoteStatus.Expired;
 
     /// <summary>
-    /// Every action <paramref name="actorRoles"/> may take on a quote in <paramref name="status"/>.
+    /// Every action <paramref name="actor"/> may take on a quote in <paramref name="status"/>
+    /// belonging to <paramref name="vendorOrganizationId"/>.
     /// </summary>
-    public static IReadOnlyList<QuoteAction> PermittedFor(QuoteStatus status, AppRole actorRoles)
+    public static IReadOnlyList<QuoteAction> PermittedFor(QuoteStatus status, DomainActor actor, Guid vendorOrganizationId)
     {
         var permitted = new List<QuoteAction>();
 
         foreach (var transition in Table)
         {
-            if (transition.From == status && actorRoles.HasAny(transition.PermittedRoles))
+            if (transition.From == status && IsPermitted(transition, actor, vendorOrganizationId))
             {
                 permitted.Add(transition.Action);
             }
@@ -69,14 +77,14 @@ public static class QuoteTransitions
 
     /// <summary>
     /// Resolves an attempted action, distinguishing "illegal from this state" from
-    /// "legal but not for these roles".
+    /// "legal but not for this actor".
     /// </summary>
     /// <remarks>
     /// The distinction is not cosmetic: the first is a 409 telling the user the world moved on,
     /// the second a 403 telling them to find a colleague. Collapsing them would make both
     /// misleading.
     /// </remarks>
-    public static TransitionResolution Resolve(QuoteStatus status, QuoteAction action, AppRole actorRoles)
+    public static TransitionResolution Resolve(QuoteStatus status, QuoteAction action, DomainActor actor, Guid vendorOrganizationId)
     {
         foreach (var transition in Table)
         {
@@ -85,7 +93,7 @@ public static class QuoteTransitions
                 continue;
             }
 
-            return actorRoles.HasAny(transition.PermittedRoles)
+            return IsPermitted(transition, actor, vendorOrganizationId)
                 ? TransitionResolution.Allowed(transition.To)
                 : TransitionResolution.DeniedByRole();
         }
@@ -97,6 +105,18 @@ public static class QuoteTransitions
     /// Whether a quote's business fields may still be changed, per AD-2's mutability rule.
     /// </summary>
     public static bool IsEditable(QuoteStatus status) => status is QuoteStatus.Draft;
+
+    private static bool IsPermitted(QuoteTransition transition, DomainActor actor, Guid vendorOrganizationId)
+    {
+        if (!actor.Roles.HasAny(transition.PermittedRoles))
+        {
+            return false;
+        }
+
+        // Role alone cannot tell one vendor from another. Ownership lives on DomainActor so both
+        // gates that need it - this table and Request.AddQuote - ask the same question.
+        return !transition.IsVendorGated || actor.CanActForVendorOrganization(vendorOrganizationId);
+    }
 }
 
 public readonly record struct TransitionResolution

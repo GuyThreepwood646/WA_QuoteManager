@@ -77,6 +77,14 @@ try
 
     builder.Services.AddOpenApi();
 
+    // AD-8: shape/format validation for every request body. Each type in Api/Models implements
+    // IValidatableObject; AddValidation wires the source-generated interceptor (see
+    // InterceptorsNamespaces in QuoteManager.Api.csproj) that runs DataAnnotations attributes, then
+    // Validate(), before a handler ever sees the model. A failure short-circuits straight to a 400
+    // ProblemDetails with per-field errors - no endpoint code, and no DomainExceptionHandler
+    // involvement.
+    builder.Services.AddValidation();
+
     // AD-8: every error leaves the process as RFC 9457 problem details. DomainExceptionHandler
     // maps typed domain violations to their stable code and status first; AddProblemDetails is
     // what lets it (and the fallback handler for anything unmapped) actually write the response.
@@ -131,6 +139,7 @@ try
     app.MapQuoteEndpoints();
     app.MapDashboardEndpoints();
     app.MapRequestEndpoints();
+    app.MapRequestActivityEndpoints();
     app.MapOrganizationEndpoints();
 
     // MapFallbackToFile has the lowest route priority, so every API and OpenAPI route above wins

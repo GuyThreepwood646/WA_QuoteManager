@@ -12,7 +12,7 @@ namespace QuoteManager.Api.IntegrationTests.Auth;
 /// </summary>
 public sealed class AnonymousEndpointsTests : IDisposable
 {
-    private const string AdminEmail = "admin@quotemgr.test";
+    private const string AdminEmail = "admin@warehouseanywhere.test";
 
     private readonly QuoteManagerApiFactory _factory = new();
     private readonly HttpClient _client;
@@ -88,6 +88,41 @@ public sealed class AnonymousEndpointsTests : IDisposable
         problem.Code.ShouldBe("auth.invalid_credentials");
     }
 
+    [Fact]
+    public async Task Logging_in_with_a_missing_password_is_rejected_as_a_validation_problem_naming_the_field()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email = AdminEmail, password = "" },
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest,
+            "the [Required] attribute on LoginRequest.Password should fail before the handler runs");
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemBody>(TestContext.Current.CancellationToken);
+        problem.ShouldNotBeNull();
+        problem.Errors.ShouldContainKey("Password");
+    }
+
+    [Fact]
+    public async Task Logging_in_with_a_whitespace_padded_email_is_rejected_as_a_validation_problem()
+    {
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email = $" {AdminEmail} ", password = DemoDataSeeder.DemoPassword },
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest,
+            "[EmailAddress] alone accepts a leading/trailing space - LoginRequest.Validate() must catch it");
+
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemBody>(TestContext.Current.CancellationToken);
+        problem.ShouldNotBeNull();
+        problem.Errors.ShouldContainKey("Email");
+    }
+
     /// <summary>Reads only the field this test cares about, since <c>ProblemDetails.Extensions</c> is dynamic.</summary>
     private sealed record ProblemDetailsBody(string Code);
+
+    /// <summary>The shape of the 400 the built-in minimal API validation (AD-8) returns.</summary>
+    private sealed record ValidationProblemBody(Dictionary<string, string[]> Errors);
 }
