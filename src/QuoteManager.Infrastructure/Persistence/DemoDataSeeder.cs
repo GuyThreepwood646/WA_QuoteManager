@@ -57,11 +57,11 @@ public sealed class DemoDataSeeder(
         // (pharmaceutical sample management, retail/CPG), and three partner types representing the
         // three services WA actually brokers: a storage facility, a packing/crating vendor, and a
         // transportation/freight carrier.
-        var meridian = Organization.Create("Meridian Pharma Sampling", OrganizationKind.Client, system.Id, now);
-        var palmetto = Organization.Create("Palmetto Retail & CPG", OrganizationKind.Client, system.Id, now);
-        var secureBase = Organization.Create("SecureBase Self Storage", OrganizationKind.Vendor, system.Id, now);
-        var crateworks = Organization.Create("Crateworks Packing & Crating", OrganizationKind.Vendor, system.Id, now);
-        var interstate = Organization.Create("Interstate Freight Partners", OrganizationKind.Vendor, system.Id, now);
+        var meridian = Organization.Create("Meridian Pharma Sampling", OrganizationKind.Client, system, now);
+        var palmetto = Organization.Create("Palmetto Retail & CPG", OrganizationKind.Client, system, now);
+        var secureBase = Organization.Create("SecureBase Self Storage", OrganizationKind.Vendor, system, now);
+        var crateworks = Organization.Create("Crateworks Packing & Crating", OrganizationKind.Vendor, system, now);
+        var interstate = Organization.Create("Interstate Freight Partners", OrganizationKind.Vendor, system, now);
 
         context.Organizations.AddRange(meridian, palmetto, secureBase, crateworks, interstate);
 

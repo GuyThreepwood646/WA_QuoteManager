@@ -9,8 +9,8 @@ namespace QuoteManager.Domain.Identity;
 /// makes the audit trail worthless.
 ///
 /// <see cref="OrganizationId"/> is null for platform staff (Admin, Reviewer) who don't act for a
-/// single organisation. It's what lets the transition table enforce that a Vendor may only touch
-/// its own organisation's quotes, instead of trusting the role claim alone.
+/// single organization. It's what lets the transition table enforce that a Vendor may only touch
+/// its own organization's quotes, instead of trusting the role claim alone.
 /// </remarks>
 public sealed record DomainActor(Guid Id, string DisplayName, AppRole Roles, Guid? OrganizationId)
 {
@@ -23,15 +23,15 @@ public sealed record DomainActor(Guid Id, string DisplayName, AppRole Roles, Gui
     public bool IsAdmin => Roles.HasAny(AppRole.Admin);
 
     /// <summary>
-    /// Whether this actor may act on behalf of a vendor organisation.
+    /// Whether this actor may act on behalf of a vendor organization.
     /// </summary>
     /// <remarks>
     /// The whole ownership rule lives here so both places a vendor gate applies — drafting a quote
     /// and transitioning one — call this instead of repeating the comparison. Two copies of an
     /// authorisation check is how one of them gets fixed later and the other doesn't.
     ///
-    /// An actor with no organisation fails deliberately: platform staff (Reviewer, Requester) act
-    /// for no vendor, so having no organisation claim grants no vendor capability. Admin is the one
+    /// An actor with no organization fails deliberately: platform staff (Reviewer, Requester) act
+    /// for no vendor, so having no organization claim grants no vendor capability. Admin is the one
     /// explicit bypass.
     /// </remarks>
     public bool CanActForVendorOrganization(Guid vendorOrganizationId) =>

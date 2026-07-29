@@ -77,6 +77,9 @@ export interface RequestDetailResponse {
   createdAt: string
   isEditable: boolean
   canAddQuote: boolean
+  canEdit: boolean
+  canCancel: boolean
+  canInviteVendor: boolean
   quotes: RequestQuoteItem[]
   invitations: RequestInvitationItem[]
 }
@@ -85,12 +88,28 @@ export interface OrganizationListItem {
   id: string
   name: string
   kind: string
+  retiredAt: string | null
+}
+
+export interface CreateOrganizationInput {
+  name: string
+  kind: 'Client' | 'Vendor'
+}
+
+export interface UpdateOrganizationInput {
+  name: string
 }
 
 export interface CreateRequestInput {
   title: string
   description?: string
   clientOrganizationId: string
+  neededBy?: string
+}
+
+export interface UpdateRequestInput {
+  title: string
+  description?: string
   neededBy?: string
 }
 
@@ -106,6 +125,13 @@ export interface ActivityEntryItem {
 
 export interface CreateQuoteInput {
   vendorOrganizationId: string
+  amount: number
+  currency: string
+  expiresAt?: string
+  notes?: string
+}
+
+export interface EditQuoteInput {
   amount: number
   currency: string
   expiresAt?: string

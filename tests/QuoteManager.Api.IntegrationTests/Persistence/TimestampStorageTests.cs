@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using QuoteManager.Domain.Identity;
 using QuoteManager.Domain.Organizations;
 using QuoteManager.Infrastructure.Persistence;
 
@@ -49,7 +50,7 @@ public sealed partial class TimestampStorageTests : IAsyncLifetime
     public async Task Timestamps_are_written_in_fixed_width_utc_form()
     {
         var created = new DateTimeOffset(2026, 3, 9, 5, 4, 3, TimeSpan.FromHours(-7));
-        _context.Organizations.Add(Organization.Create("Acme", OrganizationKind.Client, Guid.Empty, created));
+        _context.Organizations.Add(Organization.Create("Acme", OrganizationKind.Client, DomainActor.System, created));
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var stored = await ScalarAsync("SELECT \"CreatedAt\" FROM \"Organizations\" LIMIT 1;");
@@ -72,8 +73,8 @@ public sealed partial class TimestampStorageTests : IAsyncLifetime
         earlier.UtcTicks.ShouldBeLessThan(later.UtcTicks, "the fixture must be a genuine inversion");
         later.Date.ShouldBeLessThan(earlier.Date, "and disagree on the date as written");
 
-        _context.Organizations.Add(Organization.Create("Earlier", OrganizationKind.Client, Guid.Empty, earlier));
-        _context.Organizations.Add(Organization.Create("Later", OrganizationKind.Client, Guid.Empty, later));
+        _context.Organizations.Add(Organization.Create("Earlier", OrganizationKind.Client, DomainActor.System, earlier));
+        _context.Organizations.Add(Organization.Create("Later", OrganizationKind.Client, DomainActor.System, later));
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var firstByText = await ScalarAsync(
@@ -88,8 +89,8 @@ public sealed partial class TimestampStorageTests : IAsyncLifetime
         // The regression this guards: the SQLite provider refuses to translate comparisons on the
         // default DateTimeOffset mapping, which would break the dashboard's expiring-soon query.
         var now = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero);
-        _context.Organizations.Add(Organization.Create("Old", OrganizationKind.Client, Guid.Empty, now.AddDays(-5)));
-        _context.Organizations.Add(Organization.Create("New", OrganizationKind.Client, Guid.Empty, now.AddDays(5)));
+        _context.Organizations.Add(Organization.Create("Old", OrganizationKind.Client, DomainActor.System, now.AddDays(-5)));
+        _context.Organizations.Add(Organization.Create("New", OrganizationKind.Client, DomainActor.System, now.AddDays(5)));
         await _context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var query = _context.Organizations.AsNoTracking()

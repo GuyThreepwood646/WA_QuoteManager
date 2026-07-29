@@ -38,7 +38,7 @@ public sealed class AcceptedQuoteIndexTests : IAsyncLifetime
         _vendorOrganizationId = Guid.CreateVersion7();
         var organizationId = Guid.CreateVersion7();
 
-        // Both organisations have to exist: quotes now carry a real foreign key to the vendor,
+        // Both organizations have to exist: quotes now carry a real foreign key to the vendor,
         // so a fabricated id is rejected by the database rather than quietly stored.
         await _context.Database.ExecuteSqlRawAsync(
             """

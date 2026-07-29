@@ -40,7 +40,7 @@ internal static partial class PersistenceLog
     [LoggerMessage(
         EventId = 1004,
         Level = LogLevel.Information,
-        Message = "Seeded {Organizations} organisations, {Users} users, {Requests} requests and {Quotes} quotes")]
+        Message = "Seeded {Organizations} organizations, {Users} users, {Requests} requests and {Quotes} quotes")]
     public static partial void SeedCompleted(
         ILogger logger,
         int organizations,

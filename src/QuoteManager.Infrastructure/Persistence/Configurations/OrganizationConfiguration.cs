@@ -21,6 +21,8 @@ public sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organiz
         builder.Property(o => o.Name).HasMaxLength(200).IsRequired();
         builder.HasIndex(o => o.Name).IsUnique();
 
+        builder.Property(o => o.RetiredAt);
+
         builder.Ignore(o => o.DomainEvents);
     }
 }

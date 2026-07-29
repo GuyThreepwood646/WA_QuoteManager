@@ -24,7 +24,7 @@ public sealed class AppUser
     public AppRole Roles { get; init; }
 
     /// <summary>
-    /// The organisation this user acts for, or null for staff who act for the platform.
+    /// The organization this user acts for, or null for staff who act for the platform.
     /// </summary>
     public Guid? OrganizationId { get; init; }
 

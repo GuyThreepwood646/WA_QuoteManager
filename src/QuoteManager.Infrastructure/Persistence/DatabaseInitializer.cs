@@ -39,7 +39,7 @@ public sealed class DatabaseInitializer(
         await context.Database.MigrateAsync(cancellationToken);
 
         // Seeding is confined to non-production environments. A seeder that can run anywhere is
-        // one configuration mistake away from writing demo organisations into real data.
+        // one configuration mistake away from writing demo organizations into real data.
         if (environment.IsProduction())
         {
             PersistenceLog.SkippingSeedInProduction(logger);

@@ -12,9 +12,9 @@ import { Label } from '@/components/ui/label'
 
 /**
  * Shown only when the server says <c>canAddQuote</c> - the request-level counterpart to a quote's
- * <c>permittedActions</c>. The vendor organisation is the caller's own,
+ * <c>permittedActions</c>. The vendor organization is the caller's own,
  * never a field on this form, so there is nothing here for a Vendor to get wrong about whose
- * organisation the draft belongs to.
+ * organization the draft belongs to.
  */
 export function AddQuoteForm({ requestId }: { requestId: string }) {
   const { session } = useAuth()

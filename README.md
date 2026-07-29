@@ -107,7 +107,7 @@ Defaults live in `src/QuoteManager.Api/appsettings.json` and need no changes to 
 
 ```bash
 dotnet build -warnaserror   # matches CI: zero warnings tolerated
-dotnet test                 # 127 tests: Domain, Architecture (dependency-direction rules), Infrastructure, API integration
+dotnet test                 # 184 tests: Domain, Architecture (dependency-direction rules), Infrastructure, API integration
 ```
 
 Frontend:
@@ -139,10 +139,10 @@ below for why, and how that's wired.
 
 | Role | What this user does | Organization scoping |
 | --- | --- | --- |
-| **Admin** | Platform staff. Can do everything any other role can do, across every organization — create requests on behalf of any client, draft or transition a quote for any vendor, force-expire a stale quote. The one role with no organization-ownership restriction. | None (acts as any org) |
-| **Requester** | Represents a *client* company that needs storage/packing/transport. Raises new requests (`POST /api/requests`) describing what's needed and by when. | Tied to one client organization, but read access is not filtered (see below) |
-| **Reviewer** | Represents the client side evaluating offers. Moves a submitted quote into review, and decides its outcome — `StartReview`, `Accept`, `Reject`, `ReturnToSubmitted`. Cannot draft or withdraw a quote (that's the vendor's action) and cannot create requests. | Not organization-scoped — a Reviewer can review any request's quotes |
-| **Vendor** | Represents a storage facility, packing crew, or freight carrier responding to a request. Drafts a quote (`POST .../quotes`), then `Submit`s or `Withdraw`s it. | **Strictly scoped to its own organization** — a Vendor account cannot draft, submit, or withdraw a quote belonging to a different vendor organization, and (unless also Admin/Reviewer/Requester) cannot even *read* another vendor's quote details, notes, or amount on a shared request |
+| **Admin** | Platform staff. Can do everything any other role can do, across every organization — create requests on behalf of any client, draft or transition a quote for any vendor, force-expire a stale quote. Also the only role that can create, rename, or retire organizations. The one role with no organization-ownership restriction. | None (acts as any org) |
+| **Requester** | Represents a *client* company that needs storage/packing/transport. Raises new requests (`POST /api/requests`), edits or cancels them while still open, and invites vendor organizations to quote. | Tied to one client organization, but read access is not filtered (see below) |
+| **Reviewer** | Represents the client side evaluating offers. Moves a submitted quote into review, and decides its outcome — `StartReview`, `Accept`, `Reject`, `ReturnToSubmitted`. Cannot draft, edit, or withdraw a quote (that's the vendor's action) and cannot create, edit, cancel, or invite vendors to a request. | Not organization-scoped — a Reviewer can review any request's quotes |
+| **Vendor** | Represents a storage facility, packing crew, or freight carrier responding to a request. Drafts a quote (`POST .../quotes`), edits its business fields while still `Draft`, then `Submit`s or `Withdraw`s it. | **Strictly scoped to its own organization** — a Vendor account cannot draft, edit, submit, or withdraw a quote belonging to a different vendor organization, and (unless also Admin/Reviewer/Requester) cannot even *read* another vendor's quote details, notes, or amount on a shared request |
 
 ### Role-based security
 
@@ -390,6 +390,9 @@ from what the UI expects.
   "createdAt": "datetime",
   "isEditable": true,
   "canAddQuote": true,
+  "canEdit": true,
+  "canCancel": true,
+  "canInviteVendor": true,
   "quotes": [ /* RequestQuoteItem */ ],
   "invitations": [ /* RequestInvitationItem */ ]
 }
@@ -444,6 +447,81 @@ from what the UI expects.
   quote" form. (An Admin can still call the create-quote endpoint on behalf of any vendor as a
   support action; that's not surfaced as a screen, so it doesn't set this flag.)
 - Every quote's `permittedActions` is computed the same way as the dedicated quote endpoint below.
+- `canEdit`, `canCancel`, and `canInviteVendor` are the request-level equivalent of `canAddQuote`
+  for the three endpoints below — each true only when the caller holds Requester or Admin, so the
+  UI never has to re-derive that role check itself. `canEdit` additionally requires `isEditable`;
+  `canCancel` and `canInviteVendor` require the request still be `Open`.
+
+#### `PUT /api/requests/{requestId}`
+
+Edits a request's own fields (title, description, needed-by). `clientOrganizationId` is absent —
+it isn't editable once a request exists.
+
+**Auth:** any authenticated user, but only succeeds for **Requester** or **Admin**, and only while
+`isEditable` is true (see above).
+
+**JSON input:**
+
+| Field | Type | Validation |
+| --- | --- | --- |
+| `title` | `string` | Required, 1–200 characters |
+| `description` | `string?` | Optional, max 2000 characters |
+| `neededBy` | `datetime?` | Optional |
+
+**JSON output — `200 OK`:** the updated `RequestDetailResponse`.
+
+**Errors:**
+- `400` validation problem — blank/oversized title.
+- `403` with `code: "request.action_not_permitted_for_role"` — caller isn't Requester or Admin.
+- `404` — request not found.
+- `409` with `code: "request.not_editable"` — a quote has already progressed past `Draft`, or the
+  request is `Awarded`/`Cancelled`.
+
+#### `POST /api/requests/{requestId}/cancel`
+
+Cancels a request. Only legal while `Open` — an awarded request represents a real commitment and
+can't be called off this way.
+
+**Auth:** any authenticated user, but only succeeds for **Requester** or **Admin**.
+
+**JSON input:** none.
+
+**JSON output — `200 OK`:** the updated `RequestDetailResponse`, with `status: "Cancelled"`.
+
+**Errors:**
+- `403` with `code: "request.action_not_permitted_for_role"` — caller isn't Requester or Admin.
+- `404` — request not found.
+- `409` with `code: "request.not_editable"` — the request is already `Awarded`.
+
+**Business logic:** cancelling an already-cancelled request is a no-op, not an error — the same
+idempotent shape `InviteVendor` (below) uses for a duplicate invite.
+
+#### `POST /api/requests/{requestId}/invitations`
+
+Invites a vendor organization to quote on a request.
+
+**Auth:** any authenticated user, but only succeeds for **Requester** or **Admin**, and only while
+the request is `Open`.
+
+**JSON input:**
+
+| Field | Type | Validation |
+| --- | --- | --- |
+| `vendorOrganizationId` | `guid` | Required, must not be `Guid.Empty` |
+
+**JSON output — `200 OK`:** the updated `RequestDetailResponse`, with the new invitation reflected
+in `invitations`.
+
+**Errors:**
+- `400` validation problem — empty `vendorOrganizationId`.
+- `400` with `code: "request.unknown_vendor_organization"` — `vendorOrganizationId` doesn't
+  reference an existing organization, or references one that isn't **vendor**-kind.
+- `403` with `code: "request.action_not_permitted_for_role"` — caller isn't Requester or Admin.
+- `404` — request not found.
+- `409` with `code: "request.not_editable"` — the request is no longer `Open`.
+
+**Business logic:** inviting the same vendor twice is a harmless no-op, not an error — a duplicate
+click shouldn't interrupt the user.
 
 #### `GET /api/requests/{requestId}/activity`
 
@@ -597,8 +675,8 @@ Terminal states (no action legal from any of these, for anyone): `Accepted`, `Re
 
 `Edit` (business-field changes to an already-drafted quote) travels in `permittedActions` as a
 signal for the UI, but is **not** a status transition — sending it to this endpoint is rejected
-before the transition table is even consulted, since it's a different kind of change (there is no
-dedicated edit-quote endpoint yet).
+before the transition table is even consulted, since it's a different kind of change with its own
+endpoint (see `PUT` below).
 
 **Accepting a quote has side effects beyond itself**, all inside the same database transaction:
 every sibling quote on the same request still in `Submitted` or `UnderReview` is automatically
@@ -606,6 +684,43 @@ rejected (`statusReason: "SupersededByAcceptedQuote"`), and the parent request's
 `Awarded`. This is what guarantees at most one accepted quote per request — enforced twice, once
 here in the aggregate and again as a database-level filtered unique index, so even a race between
 two concurrent accept attempts can't leave two accepted quotes.
+
+#### `PUT /api/requests/{requestId}/quotes/{quoteId}`
+
+Edits a quote's business fields (amount, currency, expiry, notes) — distinct from the status
+transitions above, and only legal while the quote is still `Draft`.
+
+**Auth:** any authenticated user; succeeds only for the quote's own vendor organization or an
+Admin, and only while the quote is `Draft` — the identical `QuoteTransitions` check the
+transition endpoint uses, resolved for the `Edit` action.
+
+**Required header:** `If-Match: "<version>"`, identical to the transitions endpoint — missing or
+malformed → `400` with `code: "quote.if_match_required"`.
+
+**JSON input — body:**
+
+| Field | Type | Validation |
+| --- | --- | --- |
+| `amount` | `decimal` | Required, must be greater than zero |
+| `currency` | `string` | Required, exactly 3 characters (ISO-4217 code) |
+| `expiresAt` | `datetime?` | Optional |
+| `notes` | `string?` | Optional, max 2000 characters |
+
+**JSON output — `200 OK`** (fresh `ETag` header): the updated `QuoteResponse` — same shape as the
+create-quote response above.
+
+**Errors:**
+- `400` validation problem — bad shape above.
+- `404` — request or quote not found.
+- `409` with `code: "quote.if_match_required"` / `"quote.concurrent_modification"` — same meaning
+  as the transitions endpoint.
+- `409` with `code: "quote.transition_not_allowed"` — the quote has progressed past `Draft`.
+- `403` with `code: "quote.action_not_permitted_for_role"` — caller isn't the owning vendor or an
+  Admin.
+
+**Business logic:** `Request.EditQuote` resolves `QuoteAction.Edit` through the same
+`QuoteTransitions` table the status endpoint uses, so ownership and the Draft-only rule can never
+drift between the two — there is no bespoke permission check written for this endpoint.
 
 Every transition, not just `Accept`, is concurrency-checked via the `If-Match`/`version` pair —
 two reviewers racing to decide the same quote will have the second one rejected with `409
@@ -617,18 +732,85 @@ quote.concurrent_modification` rather than silently overwriting the first.
 
 **Auth:** any authenticated user.
 
-**JSON input:** query string only — `page`, `pageSize`.
+**JSON input:** query string — `page`, `pageSize`, `includeRetired` (`bool`, default `false`).
 
 **JSON output — `200 OK`:** paged envelope of `OrganizationListItem`:
 
 ```jsonc
-{ "id": "guid", "name": "string", "kind": "Client|Vendor" }
+{ "id": "guid", "name": "string", "kind": "Client|Vendor", "retiredAt": "datetime|null" }
 ```
 
-**Business logic:** a simple, unfiltered directory — every authenticated user reads every
-organization (there's no per-user visibility rule here; the rule that matters, vendor-quote
-visibility, lives on the requests/quotes endpoints above). Used by the UI to render the
-Organizations screen and to resolve names for display elsewhere.
+**Business logic:** a simple directory — every authenticated user reads every organization
+(there's no per-user visibility rule here; the rule that matters, vendor-quote visibility, lives
+on the requests/quotes endpoints above). Retired organizations are excluded unless
+`includeRetired=true` is passed — every picker context (new-request's client dropdown,
+invite-vendor's vendor dropdown) uses the default, so a retired organization is never offered for
+a *new* association, while the Admin-facing Organizations screen passes `includeRetired=true` so
+retired rows stay visible and manageable.
+
+#### `POST /api/organizations`
+
+**Auth:** any authenticated user, but only succeeds for **Admin** — every other role already acts
+for an existing organization, so none has a reason to mint a new one.
+
+**JSON input:**
+
+| Field | Type | Validation |
+| --- | --- | --- |
+| `name` | `string` | Required, 1–200 characters |
+| `kind` | `string` (enum) | Required; must be `Client` or `Vendor` |
+
+**JSON output — `201 Created`** (`Location: /api/organizations/{id}`): an `OrganizationListItem`.
+
+**Errors:**
+- `400` validation problem — blank/oversized name, unrecognised `kind`.
+- `403` with `code: "organization.action_not_permitted_for_role"` — caller isn't an Admin.
+- `409` with `code: "organization.duplicate_name"` — another organization already has this name.
+
+**Business logic:** the endpoint pre-checks the name for a friendly conflict before calling
+`Organization.Create`, then falls back to catching the database's own unique-index violation if
+two requests race past that check at the same time — the index, not the pre-check, is the actual
+guarantee.
+
+#### `PUT /api/organizations/{organizationId}`
+
+Renames an organization. `kind` is immutable and isn't part of this call — changing client/vendor
+after a request or quote already references the organization would silently invalidate what those
+records depend on.
+
+**Auth:** any authenticated user, but only succeeds for **Admin**.
+
+**JSON input:**
+
+| Field | Type | Validation |
+| --- | --- | --- |
+| `name` | `string` | Required, 1–200 characters |
+
+**JSON output — `200 OK`:** the updated `OrganizationListItem`.
+
+**Errors:**
+- `400` validation problem — blank/oversized name.
+- `403` with `code: "organization.action_not_permitted_for_role"` — caller isn't an Admin.
+- `404` — organization not found.
+- `409` with `code: "organization.duplicate_name"` — another organization already has this name.
+
+#### `POST /api/organizations/{organizationId}/retire`
+
+Soft-deletes an organization: it stops being offered for new associations, but existing requests
+and quotes that already reference it are untouched.
+
+**Auth:** any authenticated user, but only succeeds for **Admin**.
+
+**JSON input:** none.
+
+**JSON output — `200 OK`:** the updated `OrganizationListItem`, with `retiredAt` now set.
+
+**Errors:**
+- `403` with `code: "organization.action_not_permitted_for_role"` — caller isn't an Admin.
+- `404` — organization not found.
+
+**Business logic:** retiring an already-retired organization is a no-op (idempotent, same shape as
+`Request.Cancel`'s already-cancelled case) rather than an error.
 
 ### Health and diagnostics
 

@@ -99,7 +99,7 @@ public sealed class Request : AggregateRoot
 
         // Mirrors the vendor-ownership gate on AddQuote: this is the client side of the same
         // problem. A Vendor or Reviewer account raising a request is not a harmless no-op, it's
-        // one organisation's staff fabricating a request on behalf of a client they don't
+        // one organization's staff fabricating a request on behalf of a client they don't
         // represent - checked here, once, rather than trusted to every future caller.
         if (!actor.Roles.HasAny(AppRole.Requester | AppRole.Admin))
         {
@@ -131,6 +131,11 @@ public sealed class Request : AggregateRoot
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
+        if (!actor.Roles.HasAny(AppRole.Requester | AppRole.Admin))
+        {
+            throw new RequestActionNotPermittedException(nameof(Update));
+        }
+
         if (!IsEditable)
         {
             throw new RequestNotEditableException(
@@ -146,7 +151,7 @@ public sealed class Request : AggregateRoot
     }
 
     /// <summary>
-    /// Invites a vendor organisation to quote.
+    /// Invites a vendor organization to quote.
     /// </summary>
     /// <remarks>
     /// Idempotent by design: inviting the same vendor twice is a harmless duplicate click, not an
@@ -155,6 +160,11 @@ public sealed class Request : AggregateRoot
     /// </remarks>
     public void InviteVendor(Guid vendorOrganizationId, DomainActor actor, DateTimeOffset now)
     {
+        if (!actor.Roles.HasAny(AppRole.Requester | AppRole.Admin))
+        {
+            throw new RequestActionNotPermittedException(nameof(InviteVendor));
+        }
+
         if (Status != RequestStatus.Open)
         {
             throw new RequestNotEditableException(
@@ -185,7 +195,7 @@ public sealed class Request : AggregateRoot
         }
 
         // Creating a quote is the other vendor-owned gate. Checking here, not only on transitions,
-        // means a Vendor can't plant a draft under a competitor's organisation and then leave it
+        // means a Vendor can't plant a draft under a competitor's organization and then leave it
         // for that competitor to discover.
         if (!actor.CanActForVendorOrganization(vendorOrganizationId))
         {
@@ -287,6 +297,11 @@ public sealed class Request : AggregateRoot
 
     public void Cancel(DomainActor actor, DateTimeOffset now)
     {
+        if (!actor.Roles.HasAny(AppRole.Requester | AppRole.Admin))
+        {
+            throw new RequestActionNotPermittedException(nameof(Cancel));
+        }
+
         if (Status == RequestStatus.Awarded)
         {
             throw new RequestNotEditableException("An awarded request cannot be cancelled.");

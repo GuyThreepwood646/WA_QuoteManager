@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from './auth/AuthProvider'
 import { DashboardPage } from './routes/DashboardPage'
 import { LoginPage } from './routes/LoginPage'
+import { NewOrganizationPage } from './routes/NewOrganizationPage'
 import { NewRequestPage } from './routes/NewRequestPage'
 import { OrganizationsPage } from './routes/OrganizationsPage'
 import { RequestDetailPage } from './routes/RequestDetailPage'
@@ -107,6 +108,7 @@ function Shell() {
             <Route path="/requests/new" element={<NewRequestPage />} />
             <Route path="/requests/:requestId" element={<RequestDetailPage />} />
             <Route path="/organizations" element={<OrganizationsPage />} />
+            <Route path="/organizations/new" element={<NewOrganizationPage />} />
           </Routes>
         </main>
       </div>

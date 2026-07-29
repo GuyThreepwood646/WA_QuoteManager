@@ -1,12 +1,12 @@
 namespace QuoteManager.Domain.Requests;
 
 /// <summary>
-/// A vendor organisation invited to quote on a request.
+/// A vendor organization invited to quote on a request.
 /// </summary>
 /// <remarks>
 /// This is the genuine many-to-many in the model: one request invites many vendors, and one vendor
 /// is invited to many requests. It is deliberately separate from the request's own client
-/// organisation, which is a one-to-many and belongs on the request as a foreign key.
+/// organization, which is a one-to-many and belongs on the request as a foreign key.
 ///
 /// Its purpose is triage. Without it the dashboard can only report the quotes that arrived; with
 /// it, the more useful fact — that two of five invited vendors have not responded — becomes

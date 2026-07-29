@@ -56,7 +56,7 @@ public sealed class ReferentialIntegrityTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_request_cannot_reference_an_organisation_that_does_not_exist()
+    public async Task A_request_cannot_reference_an_organization_that_does_not_exist()
     {
         var exception = await Should.ThrowAsync<SqliteException>(() => ExecuteAsync($"""
             INSERT INTO "Requests" ("Id", "Title", "Description", "ClientOrganizationId", "Status",
@@ -132,12 +132,12 @@ public sealed class ReferentialIntegrityTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_organisation_still_referenced_by_a_request_cannot_be_deleted()
+    public async Task An_organization_still_referenced_by_a_request_cannot_be_deleted()
     {
         await InsertRequestAsync();
 
         // Restrict rather than cascade: silently destroying a request and its whole audit history
-        // because someone tidied up an organisation would be far worse than a failed delete.
+        // because someone tidied up an organization would be far worse than a failed delete.
         var exception = await Should.ThrowAsync<SqliteException>(() =>
             ExecuteAsync($"""DELETE FROM "Organizations" WHERE "Id" = {Quoted(_clientOrganizationId)};"""));
 

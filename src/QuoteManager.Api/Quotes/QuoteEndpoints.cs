@@ -30,13 +30,18 @@ public static class QuoteEndpoints
     {
         // Drafting a quote against a request. Same rule as the transition endpoint below -
         // Request.AddQuote's CanActForVendorOrganization check is the sole authority on whether
-        // this caller may draft under the named vendor organisation.
+        // this caller may draft under the named vendor organization.
         endpoints.MapPost("/api/requests/{requestId:guid}/quotes", CreateQuoteAsync);
 
         var group = endpoints.MapGroup("/api/requests/{requestId:guid}/quotes/{quoteId:guid}");
 
         // Reads carry a weak ETag so a client can round-trip it as If-Match.
         group.MapGet("", GetQuoteAsync);
+
+        // Business-field edits (amount/currency/expiry/notes), distinct from a status transition -
+        // Request.EditQuote resolves QuoteAction.Edit through the same QuoteTransitions table, so
+        // ownership and the Draft-only rule are enforced there, not here.
+        group.MapPut("", EditQuoteAsync);
 
         // The one action-driven transition endpoint. No [Authorize(Roles = ...)] here or anywhere
         // near it - QuoteTransitions.Resolve, called inside ApplyQuoteAction, is the only
@@ -60,7 +65,7 @@ public static class QuoteEndpoints
         }
 
         // Throws RequestNotEditableException (request already awarded/cancelled) or
-        // QuoteTransitionNotAllowedException (wrong vendor organisation) - both are mapped by the
+        // QuoteTransitionNotAllowedException (wrong vendor organization) - both are mapped by the
         // DomainExceptionHandler, so no try/catch belongs here.
         var quote = request.AddQuote(
             body.VendorOrganizationId,
@@ -103,6 +108,50 @@ public static class QuoteEndpoints
             return Results.NotFound();
         }
 
+        SetETag(httpContext, quote.Version);
+        return Results.Ok(ToResponse(quote, currentUser.ToActor()));
+    }
+
+    private static async Task<IResult> EditQuoteAsync(
+        Guid requestId,
+        Guid quoteId,
+        EditQuoteRequest body,
+        HttpContext httpContext,
+        QuoteManagerDbContext db,
+        ICurrentUser currentUser,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        if (!TryReadIfMatchVersion(httpContext.Request, out var expectedVersion))
+        {
+            return Results.Problem(
+                title: "A valid If-Match header is required",
+                detail: "Edits must round-trip the ETag returned by GET, so a lost update cannot silently overwrite a concurrent change.",
+                statusCode: StatusCodes.Status400BadRequest,
+                extensions: new Dictionary<string, object?> { ["code"] = "quote.if_match_required" });
+        }
+
+        var request = await db.Requests.FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+        if (request is null)
+        {
+            return Results.NotFound();
+        }
+
+        // Throws QuoteNotFoundInRequestException / QuoteTransitionNotAllowedException (wrong
+        // owner, or the quote is past Draft) / QuoteConcurrencyException on refusal - the
+        // DomainExceptionHandler maps every one of them, so no try/catch belongs here.
+        request.EditQuote(
+            quoteId,
+            new Money(body.Amount, body.Currency),
+            body.ExpiresAt,
+            body.Notes,
+            currentUser.ToActor(),
+            timeProvider.GetUtcNow(),
+            expectedVersion);
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        var quote = request.Quotes.First(q => q.Id == quoteId);
         SetETag(httpContext, quote.Version);
         return Results.Ok(ToResponse(quote, currentUser.ToActor()));
     }

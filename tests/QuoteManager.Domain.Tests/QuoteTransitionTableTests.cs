@@ -103,7 +103,7 @@ public sealed class QuoteTransitionTableTests
     [Fact]
     public void A_vendor_cannot_act_on_another_vendors_quote()
     {
-        // Role matches, organisation does not. Without the ownership check
+        // Role matches, organization does not. Without the ownership check
         // this would succeed, and any Vendor could Withdraw a competitor's Submitted quote.
         var resolution = QuoteTransitions.Resolve(QuoteStatus.Submitted, QuoteAction.Withdraw, Vendor, OtherOrg);
 
@@ -115,7 +115,7 @@ public sealed class QuoteTransitionTableTests
     }
 
     [Fact]
-    public void A_vendor_without_an_organisation_claim_cannot_take_vendor_gated_actions()
+    public void A_vendor_without_an_organization_claim_cannot_take_vendor_gated_actions()
     {
         var orphan = new DomainActor(
             Guid.Parse("77777777-7777-7777-7777-777777777777"),

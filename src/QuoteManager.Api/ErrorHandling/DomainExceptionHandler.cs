@@ -27,6 +27,8 @@ public sealed class DomainExceptionHandler(IProblemDetailsService problemDetails
                 e.Message),
             QuoteNotFoundInRequestException e => (StatusCodes.Status404NotFound, e.Code, e.Message),
             RequestCreationNotPermittedException e => (StatusCodes.Status403Forbidden, e.Code, e.Message),
+            RequestActionNotPermittedException e => (StatusCodes.Status403Forbidden, e.Code, e.Message),
+            OrganizationActionNotPermittedException e => (StatusCodes.Status403Forbidden, e.Code, e.Message),
             DomainException e => (StatusCodes.Status409Conflict, e.Code, e.Message),
             DbUpdateConcurrencyException => (
                 StatusCodes.Status409Conflict,

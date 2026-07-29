@@ -3,18 +3,16 @@ using System.ComponentModel.DataAnnotations;
 namespace QuoteManager.Api.Models;
 
 /// <summary>
-/// The body of <c>POST /api/requests/{requestId}/quotes</c>.
+/// The body of <c>PUT /api/requests/{requestId}/quotes/{quoteId}</c>.
 /// </summary>
 /// <remarks>
-/// <see cref="VendorOrganizationId"/> travels in the body rather than being inferred from the
-/// caller, because an Admin may draft on behalf of any vendor - <c>Request.AddQuote</c> is still
-/// the sole authority on whether the caller may act for the organization named here, so this type
-/// validates only shape, never ownership.
+/// Every field is required, mirroring <see cref="CreateQuoteRequest"/> minus
+/// <see cref="CreateQuoteRequest.VendorOrganizationId"/>, which is immutable once a quote exists.
+/// Whether the caller may edit *this* quote at all - ownership, and that it's still in
+/// <c>Draft</c> - is decided entirely by <c>Request.EditQuote</c>; this type validates only shape.
 /// </remarks>
-public sealed record CreateQuoteRequest : IValidatableObject
+public sealed record EditQuoteRequest : IValidatableObject
 {
-    public required Guid VendorOrganizationId { get; init; }
-
     public required decimal Amount { get; init; }
 
     [Required]
@@ -28,13 +26,6 @@ public sealed record CreateQuoteRequest : IValidatableObject
 
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
-        if (VendorOrganizationId == Guid.Empty)
-        {
-            yield return new ValidationResult(
-                "vendorOrganizationId is required.",
-                [nameof(VendorOrganizationId)]);
-        }
-
         if (Amount <= 0)
         {
             yield return new ValidationResult(

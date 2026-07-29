@@ -26,8 +26,8 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
             .HasMaxLength(128)
             .IsRequired();
 
-        // Nullable: platform staff act for no organisation. Restrict rather than cascade, because
-        // deleting an organisation should fail loudly while its people still reference it.
+        // Nullable: platform staff act for no organization. Restrict rather than cascade, because
+        // deleting an organization should fail loudly while its people still reference it.
         builder.HasOne<Organization>()
             .WithMany()
             .HasForeignKey(u => u.OrganizationId)

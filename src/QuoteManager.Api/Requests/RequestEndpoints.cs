@@ -50,6 +50,9 @@ public sealed record RequestDetailResponse(
     DateTimeOffset CreatedAt,
     bool IsEditable,
     bool CanAddQuote,
+    bool CanEdit,
+    bool CanCancel,
+    bool CanInviteVendor,
     IReadOnlyList<RequestQuoteItem> Quotes,
     IReadOnlyList<RequestInvitationItem> Invitations);
 
@@ -65,6 +68,9 @@ public static class RequestEndpoints
         endpoints.MapGet("/api/requests", GetRequestsAsync);
         endpoints.MapPost("/api/requests", CreateRequestAsync);
         endpoints.MapGet("/api/requests/{requestId:guid}", GetRequestAsync);
+        endpoints.MapPut("/api/requests/{requestId:guid}", UpdateRequestAsync);
+        endpoints.MapPost("/api/requests/{requestId:guid}/cancel", CancelRequestAsync);
+        endpoints.MapPost("/api/requests/{requestId:guid}/invitations", InviteVendorAsync);
     }
 
     private static async Task<PagedResult<RequestListItem>> GetRequestsAsync(
@@ -121,8 +127,8 @@ public static class RequestEndpoints
         if (clientOrganization is null || clientOrganization.Kind != OrganizationKind.Client)
         {
             return Results.Problem(
-                title: "Unknown client organisation",
-                detail: "clientOrganizationId must reference an existing client organisation.",
+                title: "Unknown client organization",
+                detail: "clientOrganizationId must reference an existing client organization.",
                 statusCode: StatusCodes.Status400BadRequest,
                 extensions: new Dictionary<string, object?> { ["code"] = "request.unknown_client_organization" });
         }
@@ -140,20 +146,7 @@ public static class RequestEndpoints
         db.Requests.Add(request);
         await db.SaveChangesAsync(cancellationToken);
 
-        var response = new RequestDetailResponse(
-            request.Id,
-            request.Title,
-            request.Description,
-            request.ClientOrganizationId,
-            clientOrganization.Name,
-            request.Status.ToString(),
-            request.NeededBy,
-            request.CreatedAt,
-            request.IsEditable,
-            ComputeCanAddQuote(request.IsEditable, currentUser.ToActor(), quotedVendorOrgIds: new HashSet<Guid>()),
-            [],
-            []);
-
+        var response = await BuildDetailResponseAsync(request, currentUser.ToActor(), db, cancellationToken);
         return Results.Created($"/api/requests/{request.Id}", response);
     }
 
@@ -173,11 +166,119 @@ public static class RequestEndpoints
             return Results.NotFound();
         }
 
-        var actor = currentUser.ToActor();
+        var response = await BuildDetailResponseAsync(request, currentUser.ToActor(), db, cancellationToken);
+        return Results.Ok(response);
+    }
 
+    /// <summary>
+    /// Editing a request's own fields (title/description/needed-by). <c>Request.Update</c> is the
+    /// sole authority on role and editability, so no check belongs here.
+    /// </summary>
+    private static async Task<IResult> UpdateRequestAsync(
+        Guid requestId,
+        UpdateRequestRequest body,
+        QuoteManagerDbContext db,
+        ICurrentUser currentUser,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        var request = await db.Requests.FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+        if (request is null)
+        {
+            return Results.NotFound();
+        }
+
+        var actor = currentUser.ToActor();
+        request.Update(body.Title, body.Description, body.NeededBy, actor, timeProvider.GetUtcNow());
+        await db.SaveChangesAsync(cancellationToken);
+
+        var response = await BuildDetailResponseAsync(request, actor, db, cancellationToken);
+        return Results.Ok(response);
+    }
+
+    /// <summary>
+    /// Cancelling a request. <c>Request.Cancel</c> is the sole authority on role and whether the
+    /// current status permits it.
+    /// </summary>
+    private static async Task<IResult> CancelRequestAsync(
+        Guid requestId,
+        QuoteManagerDbContext db,
+        ICurrentUser currentUser,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        var request = await db.Requests.FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+        if (request is null)
+        {
+            return Results.NotFound();
+        }
+
+        var actor = currentUser.ToActor();
+        request.Cancel(actor, timeProvider.GetUtcNow());
+        await db.SaveChangesAsync(cancellationToken);
+
+        var response = await BuildDetailResponseAsync(request, actor, db, cancellationToken);
+        return Results.Ok(response);
+    }
+
+    /// <summary>
+    /// Inviting a vendor organization to quote. <c>Request.InviteVendor</c> is the sole authority
+    /// on role and whether the current status permits it; whether the named organization exists
+    /// and is vendor-kind needs a database lookup, so that check lives here, mirroring
+    /// <see cref="CreateRequestAsync"/>'s client-organization check.
+    /// </summary>
+    private static async Task<IResult> InviteVendorAsync(
+        Guid requestId,
+        InviteVendorRequest body,
+        QuoteManagerDbContext db,
+        ICurrentUser currentUser,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        var request = await db.Requests.FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
+        if (request is null)
+        {
+            return Results.NotFound();
+        }
+
+        var vendorOrganization = await db.Organizations.AsNoTracking()
+            .FirstOrDefaultAsync(o => o.Id == body.VendorOrganizationId, cancellationToken);
+
+        if (vendorOrganization is null || vendorOrganization.Kind != OrganizationKind.Vendor)
+        {
+            return Results.Problem(
+                title: "Unknown vendor organization",
+                detail: "vendorOrganizationId must reference an existing vendor organization.",
+                statusCode: StatusCodes.Status400BadRequest,
+                extensions: new Dictionary<string, object?> { ["code"] = "request.unknown_vendor_organization" });
+        }
+
+        var actor = currentUser.ToActor();
+        request.InviteVendor(body.VendorOrganizationId, actor, timeProvider.GetUtcNow());
+        await db.SaveChangesAsync(cancellationToken);
+
+        var response = await BuildDetailResponseAsync(request, actor, db, cancellationToken);
+        return Results.Ok(response);
+    }
+
+    /// <summary>Internal rather than private: shared with <see cref="RequestActivityEndpoints"/>, which applies the exact same read-side filter to the timeline.</summary>
+    internal static bool IsVendorOnlyView(DomainActor actor) =>
+        actor.Roles.HasAny(AppRole.Vendor) && !actor.Roles.HasAny(AppRole.Admin | AppRole.Reviewer | AppRole.Requester);
+
+    /// <summary>
+    /// The one place a <see cref="RequestDetailResponse"/> is projected, so <c>GET</c> and every
+    /// mutating endpoint that returns the updated request agree on shape, visibility filtering,
+    /// and the computed capability flags.
+    /// </summary>
+    private static async Task<RequestDetailResponse> BuildDetailResponseAsync(
+        Request request,
+        DomainActor actor,
+        QuoteManagerDbContext db,
+        CancellationToken cancellationToken)
+    {
         // Admin/Reviewer/Requester are the client side of a request and need every quote to
         // compare offers, so they see everything. A pure Vendor account acts on
-        // only its own organisation's quote (write side, already enforced by QuoteTransitions) and
+        // only its own organization's quote (write side, already enforced by QuoteTransitions) and
         // must not be able to read a competitor's amount, notes, or even the fact that a competing
         // quote or invitation exists on a shared request - visibility is filtered to match.
         var visibleQuotes = IsVendorOnlyView(actor)
@@ -201,7 +302,9 @@ public static class RequestEndpoints
         // the viewer is entitled to know about their own invitation regardless of who else quoted.
         var quotedVendorIds = request.Quotes.Select(q => q.VendorOrganizationId).ToHashSet();
 
-        var response = new RequestDetailResponse(
+        var canActOnRequest = actor.Roles.HasAny(AppRole.Requester | AppRole.Admin);
+
+        return new RequestDetailResponse(
             request.Id,
             request.Title,
             request.Description,
@@ -212,6 +315,9 @@ public static class RequestEndpoints
             request.CreatedAt,
             request.IsEditable,
             ComputeCanAddQuote(request.IsEditable, actor, quotedVendorIds),
+            request.IsEditable && canActOnRequest,
+            request.Status == RequestStatus.Open && canActOnRequest,
+            request.Status == RequestStatus.Open && canActOnRequest,
             visibleQuotes.Select(quote => new RequestQuoteItem(
                 quote.Id,
                 quote.VendorOrganizationId,
@@ -234,13 +340,7 @@ public static class RequestEndpoints
                 invitation.InvitedAt,
                 quotedVendorIds.Contains(invitation.VendorOrganizationId)))
                 .ToList());
-
-        return Results.Ok(response);
     }
-
-    /// <summary>Internal rather than private: shared with <see cref="RequestActivityEndpoints"/>, which applies the exact same read-side filter to the timeline.</summary>
-    internal static bool IsVendorOnlyView(DomainActor actor) =>
-        actor.Roles.HasAny(AppRole.Vendor) && !actor.Roles.HasAny(AppRole.Admin | AppRole.Reviewer | AppRole.Requester);
 
     /// <summary>
     /// The request-level counterpart to a quote's <c>permittedActions</c>: whether this viewer

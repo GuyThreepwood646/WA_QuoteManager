@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 const selectClassName =
   'h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30'
@@ -108,24 +109,24 @@ export function NewRequestPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="clientOrganization">Client organisation</Label>
-              <select
-                id="clientOrganization"
-                className={selectClassName}
+              <Label htmlFor="clientOrganization">Client organization</Label>
+              <Select
                 value={clientOrganizationId}
-                onChange={(event) => setClientOrganizationId(event.currentTarget.value)}
+                onValueChange={setClientOrganizationId}
                 disabled={isPending}
                 required
               >
-                <option value="" disabled>
-                  {isPending ? 'Loading…' : 'Select a client organisation'}
-                </option>
-                {clientOrganizations.map((org) => (
-                  <option key={org.id} value={org.id}>
-                    {org.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="clientOrganization" className="w-full">
+                  <SelectValue placeholder={isPending ? 'Loading…' : 'Select a client organization'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {clientOrganizations.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>
+                      {org.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="flex flex-col gap-2">

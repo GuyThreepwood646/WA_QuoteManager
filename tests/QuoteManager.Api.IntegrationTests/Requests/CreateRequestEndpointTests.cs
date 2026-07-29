@@ -21,7 +21,7 @@ public sealed class CreateRequestEndpointTests : IDisposable
     public void Dispose() => _factory.Dispose();
 
     [Fact]
-    public async Task A_requester_can_raise_a_request_for_a_client_organisation()
+    public async Task A_requester_can_raise_a_request_for_a_client_organization()
     {
         var ct = TestContext.Current.CancellationToken;
         var client = await LoginAsAsync("requester@warehouseanywhere.test");
@@ -97,7 +97,7 @@ public sealed class CreateRequestEndpointTests : IDisposable
     }
 
     [Fact]
-    public async Task A_vendor_organisation_id_is_rejected_because_it_is_not_a_client()
+    public async Task A_vendor_organization_id_is_rejected_because_it_is_not_a_client()
     {
         var ct = TestContext.Current.CancellationToken;
         var client = await LoginAsAsync("requester@warehouseanywhere.test");
@@ -132,7 +132,7 @@ public sealed class CreateRequestEndpointTests : IDisposable
     }
 
     [Fact]
-    public async Task An_empty_client_organisation_id_is_rejected_before_any_lookup_runs()
+    public async Task An_empty_client_organization_id_is_rejected_before_any_lookup_runs()
     {
         var ct = TestContext.Current.CancellationToken;
         var client = await LoginAsAsync("requester@warehouseanywhere.test");

@@ -13,13 +13,13 @@ public enum AppRole
 {
     None = 0,
 
-    /// <summary>Raises and manages requests on behalf of a client organisation.</summary>
+    /// <summary>Raises and manages requests on behalf of a client organization.</summary>
     Requester = 1 << 0,
 
     /// <summary>Moves quotes through review and decides the outcome.</summary>
     Reviewer = 1 << 1,
 
-    /// <summary>Creates, submits, and withdraws quotes for its own organisation.</summary>
+    /// <summary>Creates, submits, and withdraws quotes for its own organization.</summary>
     Vendor = 1 << 2,
 
     Admin = 1 << 3,

@@ -3,10 +3,12 @@ import type {
   ActivityEntryItem,
   CreateQuoteInput,
   CreateRequestInput,
+  EditQuoteInput,
   PagedResult,
   RequestDetailResponse,
   RequestListItem,
   RequestQuoteItem,
+  UpdateRequestInput,
 } from './types'
 
 export function listRequests(pageSize = 100): Promise<PagedResult<RequestListItem>> {
@@ -27,6 +29,21 @@ export function createRequest(input: CreateRequestInput): Promise<RequestDetailR
   return apiClient.post<RequestDetailResponse>('/api/requests', input)
 }
 
+/** Edits a request's own fields. The API is the sole authority on role and editability. */
+export function updateRequest(requestId: string, input: UpdateRequestInput): Promise<RequestDetailResponse> {
+  return apiClient.put<RequestDetailResponse>(`/api/requests/${requestId}`, input)
+}
+
+/** Cancels a request. The API is the sole authority on role and whether the status permits it. */
+export function cancelRequest(requestId: string): Promise<RequestDetailResponse> {
+  return apiClient.post<RequestDetailResponse>(`/api/requests/${requestId}/cancel`)
+}
+
+/** Invites a vendor organization to quote on a request. */
+export function inviteVendor(requestId: string, vendorOrganizationId: string): Promise<RequestDetailResponse> {
+  return apiClient.post<RequestDetailResponse>(`/api/requests/${requestId}/invitations`, { vendorOrganizationId })
+}
+
 /** Drafts a quote against a request. */
 export function createQuote(requestId: string, input: CreateQuoteInput): Promise<RequestQuoteItem> {
   return apiClient.post<RequestQuoteItem>(`/api/requests/${requestId}/quotes`, input)
@@ -45,6 +62,19 @@ export function applyQuoteAction(
   return apiClient.post<RequestQuoteItem>(
     `/api/requests/${requestId}/quotes/${quote.id}/transitions`,
     { action },
+    { 'If-Match': `"${quote.version}"` },
+  )
+}
+
+/** Edits an already-drafted quote's business fields, round-tripping its `version` as If-Match. */
+export function editQuote(
+  requestId: string,
+  quote: Pick<RequestQuoteItem, 'id' | 'version'>,
+  input: EditQuoteInput,
+): Promise<RequestQuoteItem> {
+  return apiClient.put<RequestQuoteItem>(
+    `/api/requests/${requestId}/quotes/${quote.id}`,
+    input,
     { 'If-Match': `"${quote.version}"` },
   )
 }

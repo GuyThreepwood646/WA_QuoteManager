@@ -22,7 +22,7 @@ public sealed class CreateQuoteEndpointTests : IDisposable
     public void Dispose() => _factory.Dispose();
 
     [Fact]
-    public async Task A_vendor_can_draft_a_quote_for_its_own_organisation_on_an_open_request()
+    public async Task A_vendor_can_draft_a_quote_for_its_own_organization_on_an_open_request()
     {
         var ct = TestContext.Current.CancellationToken;
         var client = await LoginAsAsync("vendor3@warehouseanywhere.test");
@@ -47,7 +47,7 @@ public sealed class CreateQuoteEndpointTests : IDisposable
     }
 
     [Fact]
-    public async Task A_vendor_cannot_draft_a_quote_under_a_competitors_organisation()
+    public async Task A_vendor_cannot_draft_a_quote_under_a_competitors_organization()
     {
         var ct = TestContext.Current.CancellationToken;
         var client = await LoginAsAsync("vendor3@warehouseanywhere.test");

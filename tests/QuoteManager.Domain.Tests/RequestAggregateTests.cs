@@ -116,7 +116,7 @@ public sealed class RequestAggregateTests
     }
 
     [Fact]
-    public void A_vendor_cannot_draft_a_quote_under_another_vendors_organisation()
+    public void A_vendor_cannot_draft_a_quote_under_another_vendors_organization()
     {
         var request = NewRequest();
 
@@ -303,6 +303,62 @@ public sealed class RequestAggregateTests
     }
 
     [Fact]
+    public void A_vendor_cannot_update_a_request()
+    {
+        var request = NewRequest();
+
+        Should.Throw<RequestActionNotPermittedException>(() =>
+                request.Update("New title", null, null, Vendor, Now))
+            .Code.ShouldBe("request.action_not_permitted_for_role");
+    }
+
+    [Fact]
+    public void A_reviewer_cannot_update_a_request()
+    {
+        var request = NewRequest();
+
+        Should.Throw<RequestActionNotPermittedException>(() =>
+            request.Update("New title", null, null, Reviewer, Now));
+    }
+
+    [Fact]
+    public void A_vendor_cannot_cancel_a_request()
+    {
+        var request = NewRequest();
+
+        Should.Throw<RequestActionNotPermittedException>(() =>
+                request.Cancel(Vendor, Now))
+            .Code.ShouldBe("request.action_not_permitted_for_role");
+    }
+
+    [Fact]
+    public void A_reviewer_cannot_cancel_a_request()
+    {
+        var request = NewRequest();
+
+        Should.Throw<RequestActionNotPermittedException>(() => request.Cancel(Reviewer, Now));
+    }
+
+    [Fact]
+    public void A_vendor_cannot_invite_a_vendor_to_a_request()
+    {
+        var request = NewRequest();
+
+        Should.Throw<RequestActionNotPermittedException>(() =>
+                request.InviteVendor(Guid.CreateVersion7(), Vendor, Now))
+            .Code.ShouldBe("request.action_not_permitted_for_role");
+    }
+
+    [Fact]
+    public void A_reviewer_cannot_invite_a_vendor_to_a_request()
+    {
+        var request = NewRequest();
+
+        Should.Throw<RequestActionNotPermittedException>(() =>
+            request.InviteVendor(Guid.CreateVersion7(), Reviewer, Now));
+    }
+
+    [Fact]
     public void Identifier_timestamps_come_from_the_injected_clock_and_not_the_wall_clock()
     {
         // UUIDv7 embeds a 48-bit millisecond timestamp in its leading bytes. Asserting on that
@@ -343,7 +399,7 @@ public sealed class RequestAggregateTests
     private Quote Submit(Request request, decimal amount, DomainActor vendor)
     {
         var organizationId = vendor.OrganizationId
-            ?? throw new InvalidOperationException("Submit helper requires a vendor with an organisation.");
+            ?? throw new InvalidOperationException("Submit helper requires a vendor with an organization.");
 
         var quote = request.AddQuote(organizationId, new Money(amount, "USD"), null, null, vendor, Now);
         request.ApplyQuoteAction(quote.Id, QuoteAction.Submit, vendor, Now);

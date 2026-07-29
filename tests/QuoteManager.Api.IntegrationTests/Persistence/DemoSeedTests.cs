@@ -149,7 +149,7 @@ public sealed class DemoSeedTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Every_quote_belongs_to_a_vendor_organisation_that_exists()
+    public async Task Every_quote_belongs_to_a_vendor_organization_that_exists()
     {
         var vendorIds = await _context.Organizations.AsNoTracking()
             .Select(o => o.Id)

@@ -34,7 +34,7 @@ public sealed class AuditTests : IDisposable
 
         entries.ShouldNotBeEmpty();
 
-        // The five organisations are created with the DomainActor.System sentinel, before
+        // The five organizations are created with the DomainActor.System sentinel, before
         // any user account exists to attribute them to - the case ActorDisplayName resolution
         // must not silently get wrong just because there is no row to look up yet.
         entries.Count(e => e.Action == "OrganizationCreated" && e.ActorDisplayName == "System")

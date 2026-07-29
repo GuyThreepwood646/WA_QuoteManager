@@ -7,9 +7,9 @@ namespace QuoteManager.Domain.Quotes;
 /// </summary>
 /// <remarks>
 /// <paramref name="IsVendorGated"/> marks rows whose <see cref="PermittedRoles"/> is the Vendor
-/// side of the table. A Vendor may only act on its own organisation's quotes, and a role check
+/// side of the table. A Vendor may only act on its own organization's quotes, and a role check
 /// alone can't express "this vendor, not any vendor" — so these rows carry an extra
-/// organisation-matching requirement that Reviewer/Admin-only rows don't need.
+/// organization-matching requirement that Reviewer/Admin-only rows don't need.
 /// </remarks>
 public sealed record QuoteTransition(
     QuoteStatus From,

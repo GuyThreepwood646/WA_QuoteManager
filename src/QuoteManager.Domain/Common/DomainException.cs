@@ -51,6 +51,18 @@ public sealed class RequestCreationNotPermittedException()
     public override string Code => "request.creation_not_permitted";
 }
 
+public sealed class OrganizationActionNotPermittedException(string action)
+    : DomainException($"The current user's roles do not permit '{action}' on an organization.")
+{
+    public override string Code => "organization.action_not_permitted_for_role";
+}
+
+public sealed class RequestActionNotPermittedException(string action)
+    : DomainException($"The current user's roles do not permit '{action}' on this request.")
+{
+    public override string Code => "request.action_not_permitted_for_role";
+}
+
 public sealed class QuoteConcurrencyException(Guid quoteId, int expectedVersion, int actualVersion)
     : DomainException(
         $"Quote '{quoteId}' has changed since it was read (expected version {expectedVersion}, found {actualVersion}).")
