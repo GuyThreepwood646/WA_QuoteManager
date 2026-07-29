@@ -250,7 +250,7 @@ public static class RequestEndpoints
     /// vendor, but that is a support action with no dedicated screen, not a signal this field
     /// needs to carry.
     /// </summary>
-    private static bool ComputeCanAddQuote(bool isEditable, DomainActor actor, IReadOnlySet<Guid> quotedVendorOrgIds) =>
+    private static bool ComputeCanAddQuote(bool isEditable, DomainActor actor, HashSet<Guid> quotedVendorOrgIds) =>
         isEditable
         && actor.Roles.HasAny(AppRole.Vendor)
         && actor.OrganizationId is { } organizationId
