@@ -4,13 +4,9 @@ using QuoteManager.Domain.Identity;
 namespace QuoteManager.Domain.Organizations;
 
 /// <summary>
-/// Which side of a request an organization sits on.
+/// Which side of a request an organization sits on. Modelled explicitly, rather than inferred
+/// from how a row happens to be referenced, so a request can't be raised against a vendor by accident.
 /// </summary>
-/// <remarks>
-/// Modelled explicitly rather than inferred from whether rows happen to reference the
-/// organization as a client or a vendor, so the two roles one entity plays are visible in the
-/// schema and a request cannot be raised on behalf of a supplier by accident.
-/// </remarks>
 public enum OrganizationKind
 {
     Client,
@@ -76,9 +72,8 @@ public sealed class Organization : AggregateRoot
     }
 
     /// <summary>
-    /// Soft-deletes the organization: it stops being offered for new associations (as a client
-    /// on a new request, or a vendor invited/drafting a quote) but existing requests and quotes
-    /// that already reference it are untouched.
+    /// Soft-deletes the organization: it stops being offered for new associations, but existing
+    /// requests and quotes that already reference it are untouched.
     /// </summary>
     public void Retire(DomainActor actor, DateTimeOffset now)
     {

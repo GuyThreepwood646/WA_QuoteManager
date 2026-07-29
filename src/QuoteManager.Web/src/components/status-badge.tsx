@@ -14,11 +14,7 @@ const statusStyles: Record<string, string> = {
   Cancelled: 'bg-muted text-muted-foreground border-transparent',
 }
 
-/**
- * The one place a lifecycle status becomes a colour: every
- * screen that shows a quote or request status renders it through here, so a status never gets a
- * one-off colour decided in the component that happens to need it that day.
- */
+/** The one place a lifecycle status becomes a color, so no screen decides its own one-off color. */
 export function StatusBadge({ status }: { status: string }) {
   return (
     <Badge variant="outline" className={cn('border font-medium', statusStyles[status])}>

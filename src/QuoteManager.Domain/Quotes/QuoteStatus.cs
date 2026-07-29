@@ -1,13 +1,9 @@
 namespace QuoteManager.Domain.Quotes;
 
 /// <summary>
-/// The quote lifecycle states.
+/// The quote lifecycle states. Persisted as strings, not ordinals, so a new state can be added
+/// later without silently renumbering stored rows.
 /// </summary>
-/// <remarks>
-/// Persisted as strings, not ordinals, so the filtered unique index enforcing "at most one
-/// accepted quote per request" can be expressed against a readable value, and inserting a new
-/// state later can't silently renumber stored rows.
-/// </remarks>
 public enum QuoteStatus
 {
     Draft,
@@ -20,12 +16,9 @@ public enum QuoteStatus
 }
 
 /// <summary>
-/// Actions a caller may attempt against a quote.
+/// Actions a caller may attempt against a quote. <see cref="Edit"/> is not a lifecycle transition
+/// but travels in the same permitted-action set so the UI never derives editability separately.
 /// </summary>
-/// <remarks>
-/// <see cref="Edit"/> is not a lifecycle transition but travels in the same permitted-action set
-/// so the UI never has to derive editability from status on its own.
-/// </remarks>
 public enum QuoteAction
 {
     Submit,

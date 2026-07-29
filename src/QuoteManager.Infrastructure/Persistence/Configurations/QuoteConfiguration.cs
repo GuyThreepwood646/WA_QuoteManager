@@ -8,9 +8,6 @@ namespace QuoteManager.Infrastructure.Persistence.Configurations;
 
 public sealed class QuoteConfiguration : IEntityTypeConfiguration<Quote>
 {
-    /// <summary>
-    /// Scale factor for storing money as integer minor units.
-    /// </summary>
     private const decimal MinorUnitsPerUnit = 100m;
 
     public void Configure(EntityTypeBuilder<Quote> builder)
@@ -20,10 +17,7 @@ public sealed class QuoteConfiguration : IEntityTypeConfiguration<Quote>
 
         builder.Property(q => q.Version).IsConcurrencyToken();
 
-        // The filtered index below depends on this being text. EF's default is the ordinal int,
-        // against which that index would compare to the literal 'Accepted' and match nothing,
-        // forever, with no error — the database guarantee would silently cease to exist while
-        // every test still passed, because the aggregate check catches the ordinary case first.
+        // Must stay text, not EF's default ordinal int — AD-3's filtered index depends on it.
         builder.Property(q => q.Status)
             .HasConversion<string>()
             .HasMaxLength(32)
@@ -31,9 +25,8 @@ public sealed class QuoteConfiguration : IEntityTypeConfiguration<Quote>
 
         builder.ComplexProperty(q => q.Amount, money =>
         {
-            // SQLite has no decimal type: EF stores decimal as TEXT, which is exact but sorts
-            // lexicographically, so ordering a quote list by amount would put 9.00 above 10.00.
-            // Integer minor units are exact and sort correctly.
+            // SQLite has no decimal type; EF stores decimal as TEXT, which sorts lexicographically
+            // (9.00 above 10.00), so amounts are stored as integer minor units instead.
             money.Property(m => m.Amount)
                 .HasColumnName("AmountMinorUnits")
                 .HasConversion(
@@ -70,10 +63,7 @@ public sealed class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         // The dashboard's two hottest reads: what is awaiting review, and what lapses soon.
         builder.HasIndex(q => new { q.Status, q.ExpiresAt });
 
-        // Second line of defence: the aggregate refuses a second acceptance in memory, but this
-        // stops two concurrent transactions that each passed that check from both committing.
-        // Note the double-quoted identifier: SQLite rejects the bracket syntax the EF Core docs
-        // show for SQL Server.
+        // AD-3: the database-side half of "guarded in the aggregate and again at the database".
         builder.HasIndex(q => q.RequestId)
             .IsUnique()
             .HasFilter("\"Status\" = 'Accepted'")

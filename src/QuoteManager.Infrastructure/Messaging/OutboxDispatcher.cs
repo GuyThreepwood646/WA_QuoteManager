@@ -10,17 +10,9 @@ namespace QuoteManager.Infrastructure.Messaging;
 
 /// <summary>
 /// The only component that reads <see cref="Persistence.Entities.OutboxMessage"/> rows and hands
-/// them to <see cref="IIntegrationEventPublisher"/>.
+/// them to <see cref="IIntegrationEventPublisher"/> — at-least-once delivery, single instance only
+/// (AD-4; see Deferred for scale-out).
 /// </summary>
-/// <remarks>
-/// Claims undispatched rows in insertion order - <c>OrderBy(m =&gt; m.Id)</c> is sufficient because
-/// every id is a UUIDv7, which sorts monotonically by creation time. A message is marked
-/// dispatched only after <see cref="IIntegrationEventPublisher.PublishAsync"/> returns without
-/// throwing, so delivery is at-least-once: a publish that succeeds but whose <c>DispatchedAt</c>
-/// write is then lost to a crash is redelivered on the next poll. Every consumer must therefore be
-/// idempotent, keyed on <see cref="IntegrationEventEnvelope.Id"/>. This drains a single instance in
-/// order; scaling out to multiple dispatchers would need a claim mechanism this doesn't have.
-/// </remarks>
 public sealed class OutboxDispatcher(
     IServiceScopeFactory scopeFactory,
     TimeProvider timeProvider,
@@ -82,9 +74,8 @@ public sealed class OutboxDispatcher(
                 MessagingLog.PublishFailed(logger, ex, message.Id, message.Type, message.Attempts);
             }
 
-            // Saved per message, not once per batch: if the Nth message's publish throws, the
-            // first N-1 successes must still be durably marked dispatched rather than re-published
-            // on the next poll just because they happened to share a batch with a failure.
+            // Saved per message so a mid-batch failure doesn't re-publish an already-successful
+            // sibling on the next poll.
             await db.SaveChangesAsync(cancellationToken);
         }
     }

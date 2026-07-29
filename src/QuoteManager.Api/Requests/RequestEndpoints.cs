@@ -56,11 +56,6 @@ public sealed record RequestDetailResponse(
     IReadOnlyList<RequestQuoteItem> Quotes,
     IReadOnlyList<RequestInvitationItem> Invitations);
 
-/// <summary>
-/// Browsing and drilling into requests. The list is intentionally thin - no aggregate fields the
-/// list screen doesn't use; the detail response is where a user actually acts, via the quote
-/// transition endpoint and each quote's <c>permittedActions</c>.
-/// </summary>
 public static class RequestEndpoints
 {
     public static void MapRequestEndpoints(this IEndpointRouteBuilder endpoints)
@@ -110,10 +105,6 @@ public static class RequestEndpoints
         return new PagedResult<RequestListItem>(items, query.ResolvedPage, query.ResolvedPageSize, total);
     }
 
-    /// <summary>
-    /// Raising a request. <c>Request.Create</c> is the sole authority on whether the actor's role
-    /// permits it, so a role check here would only be a second, driftable copy of that rule.
-    /// </summary>
     private static async Task<IResult> CreateRequestAsync(
         CreateRequestRequest body,
         QuoteManagerDbContext db,
@@ -133,8 +124,6 @@ public static class RequestEndpoints
                 extensions: new Dictionary<string, object?> { ["code"] = "request.unknown_client_organization" });
         }
 
-        // Throws RequestCreationNotPermittedException for a Vendor/Reviewer caller; the
-        // DomainExceptionHandler maps it to 403, so no role check belongs here.
         var request = Request.Create(
             body.Title,
             body.Description,
@@ -156,8 +145,6 @@ public static class RequestEndpoints
         ICurrentUser currentUser,
         CancellationToken cancellationToken)
     {
-        // AutoInclude (RequestConfiguration) brings Quotes and Invitations along for free; there is
-        // no navigation to Organization, so vendor/client names are resolved by a second lookup.
         var request = await db.Requests.AsNoTracking()
             .FirstOrDefaultAsync(r => r.Id == requestId, cancellationToken);
 
@@ -170,10 +157,6 @@ public static class RequestEndpoints
         return Results.Ok(response);
     }
 
-    /// <summary>
-    /// Editing a request's own fields (title/description/needed-by). <c>Request.Update</c> is the
-    /// sole authority on role and editability, so no check belongs here.
-    /// </summary>
     private static async Task<IResult> UpdateRequestAsync(
         Guid requestId,
         UpdateRequestRequest body,
@@ -196,10 +179,6 @@ public static class RequestEndpoints
         return Results.Ok(response);
     }
 
-    /// <summary>
-    /// Cancelling a request. <c>Request.Cancel</c> is the sole authority on role and whether the
-    /// current status permits it.
-    /// </summary>
     private static async Task<IResult> CancelRequestAsync(
         Guid requestId,
         QuoteManagerDbContext db,
@@ -221,12 +200,6 @@ public static class RequestEndpoints
         return Results.Ok(response);
     }
 
-    /// <summary>
-    /// Inviting a vendor organization to quote. <c>Request.InviteVendor</c> is the sole authority
-    /// on role and whether the current status permits it; whether the named organization exists
-    /// and is vendor-kind needs a database lookup, so that check lives here, mirroring
-    /// <see cref="CreateRequestAsync"/>'s client-organization check.
-    /// </summary>
     private static async Task<IResult> InviteVendorAsync(
         Guid requestId,
         InviteVendorRequest body,
@@ -265,22 +238,14 @@ public static class RequestEndpoints
     internal static bool IsVendorOnlyView(DomainActor actor) =>
         actor.Roles.HasAny(AppRole.Vendor) && !actor.Roles.HasAny(AppRole.Admin | AppRole.Reviewer | AppRole.Requester);
 
-    /// <summary>
-    /// The one place a <see cref="RequestDetailResponse"/> is projected, so <c>GET</c> and every
-    /// mutating endpoint that returns the updated request agree on shape, visibility filtering,
-    /// and the computed capability flags.
-    /// </summary>
     private static async Task<RequestDetailResponse> BuildDetailResponseAsync(
         Request request,
         DomainActor actor,
         QuoteManagerDbContext db,
         CancellationToken cancellationToken)
     {
-        // Admin/Reviewer/Requester are the client side of a request and need every quote to
-        // compare offers, so they see everything. A pure Vendor account acts on
-        // only its own organization's quote (write side, already enforced by QuoteTransitions) and
-        // must not be able to read a competitor's amount, notes, or even the fact that a competing
-        // quote or invitation exists on a shared request - visibility is filtered to match.
+        // AD-13: a pure Vendor account must not see a competitor's quote or invitation on a shared
+        // request, so only its own view is filtered here; Admin/Reviewer/Requester need every quote.
         var visibleQuotes = IsVendorOnlyView(actor)
             ? request.Quotes.Where(quote => quote.VendorOrganizationId == actor.OrganizationId).ToList()
             : request.Quotes;
@@ -342,13 +307,6 @@ public static class RequestEndpoints
                 .ToList());
     }
 
-    /// <summary>
-    /// The request-level counterpart to a quote's <c>permittedActions</c>: whether this viewer
-    /// should be shown a form to draft a new quote on this request. Scoped to the vendor
-    /// self-serve path only - Admin can still call the create-quote endpoint on behalf of any
-    /// vendor, but that is a support action with no dedicated screen, not a signal this field
-    /// needs to carry.
-    /// </summary>
     private static bool ComputeCanAddQuote(bool isEditable, DomainActor actor, HashSet<Guid> quotedVendorOrgIds) =>
         isEditable
         && actor.Roles.HasAny(AppRole.Vendor)

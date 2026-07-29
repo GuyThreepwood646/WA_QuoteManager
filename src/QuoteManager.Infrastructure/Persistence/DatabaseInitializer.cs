@@ -5,13 +5,10 @@ using Microsoft.Extensions.Logging;
 namespace QuoteManager.Infrastructure.Persistence;
 
 /// <summary>
-/// Brings the database up to date at start-up, and seeds it when the environment permits.
+/// Brings the database up to date at start-up and seeds it when the environment permits.
+/// <c>EnsureCreated</c> is never used — it would skip migration history and silently omit AD-3's
+/// filtered unique index (AD-16).
 /// </summary>
-/// <remarks>
-/// Migrations are the only schema authority. <c>EnsureCreated</c> is deliberately not used
-/// anywhere — it builds a schema from the model while skipping migration history, which would
-/// silently omit the filtered unique index the accepted-quote invariant depends on.
-/// </remarks>
 public sealed class DatabaseInitializer(
     QuoteManagerDbContext context,
     DemoDataSeeder seeder,
@@ -38,8 +35,8 @@ public sealed class DatabaseInitializer(
 
         await context.Database.MigrateAsync(cancellationToken);
 
-        // Seeding is confined to non-production environments. A seeder that can run anywhere is
-        // one configuration mistake away from writing demo organizations into real data.
+        // Confined to non-production: a seeder that can run anywhere is one configuration mistake
+        // away from writing demo data into a real database.
         if (environment.IsProduction())
         {
             PersistenceLog.SkippingSeedInProduction(logger);

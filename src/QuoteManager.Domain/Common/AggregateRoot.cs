@@ -17,12 +17,9 @@ public abstract class AggregateRoot
     public Guid Id { get; private set; }
 
     /// <summary>
-    /// Incremented on every state change and mapped as an EF concurrency token.
+    /// Incremented on every state change and mapped as an EF concurrency token — a plain integer,
+    /// not <c>IsRowVersion()</c>, since SQLite has no <c>rowversion</c> type.
     /// </summary>
-    /// <remarks>
-    /// SQLite has no <c>rowversion</c> type, so EF can't generate this for us — hence a plain
-    /// integer instead of <c>IsRowVersion()</c>.
-    /// </remarks>
     public int Version { get; private set; }
 
     public IReadOnlyList<IDomainEvent> DomainEvents => _domainEvents;

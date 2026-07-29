@@ -3,14 +3,10 @@ using QuoteManager.Application.Messaging;
 namespace QuoteManager.Application.Abstractions;
 
 /// <summary>
-/// The one port by which an integration event actually leaves the process.
+/// The one port by which an integration event leaves the process. Two adapters exist (in-process
+/// channel, Azure Service Bus), selected in <c>Infrastructure/DependencyInjection.cs</c>; callers
+/// depend on this interface only.
 /// </summary>
-/// <remarks>
-/// Exactly two adapters exist: an in-process channel used by default, and an Azure Service Bus
-/// adapter selected only when its connection string is configured. Selection happens in one
-/// composition-root file (<c>Infrastructure/DependencyInjection.cs</c>); the outbox dispatcher and
-/// any future use-case code depend on this interface only, never on a concrete adapter.
-/// </remarks>
 public interface IIntegrationEventPublisher
 {
     Task PublishAsync(IntegrationEventEnvelope envelope, CancellationToken cancellationToken);

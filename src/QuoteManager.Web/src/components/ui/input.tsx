@@ -16,7 +16,7 @@ function Input({ className, type, onClick, ...props }: React.ComponentProps<"inp
         input.showPicker?.()
       } catch {
         // Unsupported in this browser, or not triggered by a direct user gesture - fall back to
-        // the browser's default click behaviour.
+        // the browser's default click behavior.
       }
     }
   }

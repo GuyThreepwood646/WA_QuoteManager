@@ -3,14 +3,10 @@ using QuoteManager.Domain.Identity;
 namespace QuoteManager.Infrastructure.Identity;
 
 /// <summary>
-/// A user account.
+/// A user account. The Domain has no user entity — it has <see cref="DomainActor"/>, which
+/// carries only the identity and roles a business rule needs — so the password hash can never be
+/// misused as part of an aggregate.
 /// </summary>
-/// <remarks>
-/// Authentication is an infrastructure concern, so the Domain has no user entity — it has
-/// <see cref="DomainActor"/>, which carries only the identity and roles a business rule needs.
-/// Keeping the password hash out of the Domain is the point: an aggregate should be impossible to
-/// misuse as a credential store.
-/// </remarks>
 public sealed class AppUser
 {
     public Guid Id { get; init; }

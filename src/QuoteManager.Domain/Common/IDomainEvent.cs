@@ -1,13 +1,10 @@
 namespace QuoteManager.Domain.Common;
 
 /// <summary>
-/// A fact about something that already happened inside an aggregate.
+/// A fact about something that already happened inside an aggregate. Every event carries the
+/// actor and timestamp an audit row needs directly, since every event is audited but only some
+/// also reach the outbox.
 /// </summary>
-/// <remarks>
-/// Every domain event gets written to the audit trail; only the ones on the integration
-/// allow-list also go to the outbox. So each event carries the actor and timestamp an audit row
-/// needs, without infrastructure code having to reconstruct them from somewhere else.
-/// </remarks>
 public interface IDomainEvent
 {
     /// <summary>Type of the entity the event is about, used as the polymorphic audit subject.</summary>

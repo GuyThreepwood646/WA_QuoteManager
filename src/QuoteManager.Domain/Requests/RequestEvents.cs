@@ -112,15 +112,11 @@ public sealed record QuoteEdited(
 }
 
 /// <summary>
-/// A quote moved between lifecycle states.
+/// A quote moved between lifecycle states. One event type carrying the action, rather than seven
+/// near-identical types, so the transition table's contents aren't duplicated as a class
+/// hierarchy that could drift from it; <see cref="Action"/> still resolves to a specific name
+/// such as <c>QuoteAccepted</c>.
 /// </summary>
-/// <remarks>
-/// One event type carrying the action rather than seven near-identical types. The audit
-/// <see cref="Action"/> still resolves to a specific name such as <c>QuoteAccepted</c>, so the
-/// timeline and the integration allow-list stay as expressive as they would be with separate
-/// classes, without the transition table's contents being duplicated as a class hierarchy that
-/// could drift from it.
-/// </remarks>
 public sealed record QuoteStatusChanged(
     Guid RequestId,
     Guid QuoteId,

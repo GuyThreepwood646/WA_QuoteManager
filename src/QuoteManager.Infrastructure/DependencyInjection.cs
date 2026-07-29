@@ -17,12 +17,9 @@ namespace QuoteManager.Infrastructure;
 public static class DependencyInjection
 {
     /// <summary>
-    /// Default database location, relative to the host's content root.
+    /// Default database location, relative to the host's content root — a default rather than a
+    /// required setting so a fresh clone runs with no configuration at all.
     /// </summary>
-    /// <remarks>
-    /// A default rather than a required setting so that a fresh clone runs with no configuration
-    /// at all, which is the whole premise of the demo.
-    /// </remarks>
     private const string DefaultConnectionString = "Data Source=quotemanager.db";
 
     public static IServiceCollection AddInfrastructure(
@@ -31,14 +28,11 @@ public static class DependencyInjection
     {
         var connectionString = configuration.GetConnectionString("QuoteManager") ?? DefaultConnectionString;
 
-        // Single injected clock. Every time-derived value in the system reads from this, which is
+        // Single injected clock — every time-derived value in the system reads from this, which is
         // what makes expiry and staleness signals reproducible under test.
         services.AddSingleton(TimeProvider.System);
 
-        // Appends an AuditEntry per domain event, and an OutboxMessage for those on the integration
-        // allow-list, inside the same SaveChanges call as the change that raised them. Registered
-        // as a singleton per EF Core's own guidance for stateless interceptors, and attached to
-        // every QuoteManagerDbContext instance.
+        // Registered as a singleton per EF Core's guidance for stateless interceptors (AD-4, AD-5).
         services.AddSingleton<DomainEventPersistenceInterceptor>();
         services.AddDbContext<QuoteManagerDbContext>((serviceProvider, options) =>
             options.UseSqlite(connectionString)
@@ -48,7 +42,6 @@ public static class DependencyInjection
         services.AddScoped<DemoDataSeeder>();
         services.AddScoped<DatabaseInitializer>();
 
-        // ICurrentUser is a per-request adapter over the authenticated principal.
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
 
@@ -58,10 +51,8 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// The one composition-root method that decides which <see cref="IIntegrationEventPublisher"/>
-    /// adapter is active. An absent <see cref="ServiceBusOptions.ConnectionString"/> resolves the
-    /// in-process channel adapter; a present one resolves the Azure Service Bus adapter. Nothing
-    /// outside this method ever branches on that setting.
+    /// The one composition-root method that selects the <see cref="IIntegrationEventPublisher"/>
+    /// adapter, per AD-6 — nothing outside this method ever branches on the connection string.
     /// </summary>
     private static void AddMessaging(this IServiceCollection services, IConfiguration configuration)
     {

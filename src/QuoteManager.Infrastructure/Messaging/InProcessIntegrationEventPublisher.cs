@@ -6,15 +6,11 @@ using QuoteManager.Application.Messaging;
 namespace QuoteManager.Infrastructure.Messaging;
 
 /// <summary>
-/// The default adapter for <see cref="IIntegrationEventPublisher"/>: an in-process channel, so the
-/// demo has a genuine local queue to show rather than a publish call that quietly does nothing.
+/// The default adapter for <see cref="IIntegrationEventPublisher"/> — an in-process channel,
+/// selected whenever <see cref="ServiceBusOptions.ConnectionString"/> is absent (AD-6). Writing to
+/// the channel is itself the "publish"; <see cref="InProcessIntegrationEventLogger"/> is the one
+/// local consumer.
 /// </summary>
-/// <remarks>
-/// Selected whenever <see cref="ServiceBusOptions.ConnectionString"/> is absent. Handing an
-/// envelope to <see cref="Channel{T}.Writer"/> is itself the "publish" - the paired
-/// <see cref="InProcessIntegrationEventLogger"/> hosted service is the one and only local
-/// consumer, standing in for whatever process would otherwise be on the other end of a real queue.
-/// </remarks>
 public sealed class InProcessIntegrationEventPublisher(
     Channel<IntegrationEventEnvelope> channel,
     ILogger<InProcessIntegrationEventPublisher> logger) : IIntegrationEventPublisher

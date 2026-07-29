@@ -5,14 +5,9 @@ using QuoteManager.Domain.Quotes;
 namespace QuoteManager.Domain.Requests;
 
 /// <summary>
-/// The lifecycle of a request, which is driven entirely by its quotes.
+/// The lifecycle of a request, driven entirely by its quotes: <see cref="Awarded"/> is reached
+/// only as a side effect of accepting a quote, in the same transaction, not via its own endpoint.
 /// </summary>
-/// <remarks>
-/// Deliberately small and without a transition table of its own. A request has no status endpoint;
-/// <see cref="Awarded"/> is reached only as a consequence of accepting a quote, inside the same
-/// transaction. Giving requests an independent lifecycle would create a second way to express the
-/// same fact and therefore a second way for it to be wrong.
-/// </remarks>
 public enum RequestStatus
 {
     Open,
@@ -21,13 +16,10 @@ public enum RequestStatus
 }
 
 /// <summary>
-/// A request for quotes, and the aggregate root that owns them.
+/// A request for quotes, and the aggregate root that owns them: the root is the request, not the
+/// quote, because the "at most one accepted" invariant spans siblings and needs a boundary that
+/// can see all of them.
 /// </summary>
-/// <remarks>
-/// The root is the request rather than the quote because the invariant that matters — at most one
-/// accepted quote — spans siblings. Enforcing it requires a boundary that can see all of them, so
-/// every quote mutation enters through this class.
-/// </remarks>
 public sealed class Request : AggregateRoot
 {
     private readonly List<Quote> _quotes = [];
@@ -76,12 +68,9 @@ public sealed class Request : AggregateRoot
     public Guid? AcceptedQuoteId => _quotes.SingleOrDefault(q => q.Status == QuoteStatus.Accepted)?.Id;
 
     /// <summary>
-    /// Invited vendors who have not yet drafted a quote.
+    /// Invited vendors who have not yet drafted a quote — makes silence visible, since a request
+    /// with no quotes otherwise looks the same whether nobody was asked or nobody replied.
     /// </summary>
-    /// <remarks>
-    /// The triage signal the invitation list exists to produce: silence is otherwise invisible,
-    /// because a request with no quotes looks identical whether nobody was asked or nobody replied.
-    /// </remarks>
     public IReadOnlyList<Guid> AwaitingResponseFrom =>
         [.. _invitations
             .Select(invitation => invitation.VendorOrganizationId)
@@ -97,10 +86,8 @@ public sealed class Request : AggregateRoot
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
-        // Mirrors the vendor-ownership gate on AddQuote: this is the client side of the same
-        // problem. A Vendor or Reviewer account raising a request is not a harmless no-op, it's
-        // one organization's staff fabricating a request on behalf of a client they don't
-        // represent - checked here, once, rather than trusted to every future caller.
+        // Client-side counterpart to AddQuote's vendor-ownership gate: without it, a Vendor or
+        // Reviewer account could raise a request on behalf of a client it doesn't represent.
         if (!actor.Roles.HasAny(AppRole.Requester | AppRole.Admin))
         {
             throw new RequestCreationNotPermittedException();
@@ -117,13 +104,10 @@ public sealed class Request : AggregateRoot
     }
 
     /// <summary>
-    /// Whether the request's own fields may still be changed.
+    /// Whether the request's own fields may still be changed: gated on the first quote past
+    /// <see cref="QuoteStatus.Draft"/>, not the request's own status, since changing scope
+    /// underneath a vendor who has already priced it silently invalidates their offer.
     /// </summary>
-    /// <remarks>
-    /// The gate is the arrival of the first quote past <see cref="QuoteStatus.Draft"/>, not the
-    /// request's status: once a vendor has priced something, changing the scope underneath them
-    /// invalidates their offer silently.
-    /// </remarks>
     public bool IsEditable =>
         Status == RequestStatus.Open && !_quotes.Exists(q => q.Status != QuoteStatus.Draft);
 
@@ -151,13 +135,9 @@ public sealed class Request : AggregateRoot
     }
 
     /// <summary>
-    /// Invites a vendor organization to quote.
+    /// Invites a vendor organization to quote. Idempotent: inviting the same vendor twice
+    /// returns quietly rather than surfacing the composite-key constraint as an error.
     /// </summary>
-    /// <remarks>
-    /// Idempotent by design: inviting the same vendor twice is a harmless duplicate click, not an
-    /// error worth interrupting a user over, and the composite primary key would reject the second
-    /// row anyway. Returning quietly is kinder than surfacing a constraint violation.
-    /// </remarks>
     public void InviteVendor(Guid vendorOrganizationId, DomainActor actor, DateTimeOffset now)
     {
         if (!actor.Roles.HasAny(AppRole.Requester | AppRole.Admin))
@@ -194,10 +174,10 @@ public sealed class Request : AggregateRoot
                 $"Quotes cannot be added to a request in state '{Status}'.");
         }
 
-        // Creating a quote is the other vendor-owned gate. Checking here, not only on transitions,
-        // means a Vendor can't plant a draft under a competitor's organization and then leave it
-        // for that competitor to discover.
-        if (!actor.CanActForVendorOrganization(vendorOrganizationId))
+        // Checked here (not only on transitions) so a Vendor can't plant a draft under a
+        // competitor's id, and the role check stops a Requester/Reviewer whose own organization id
+        // happens to match from doing the same despite holding no Vendor capability.
+        if (!actor.Roles.HasAny(AppRole.Vendor | AppRole.Admin) || !actor.CanActForVendorOrganization(vendorOrganizationId))
         {
             throw new QuoteTransitionNotAllowedException(
                 new QuoteStatusName(QuoteStatus.Draft.ToString()),
@@ -228,13 +208,10 @@ public sealed class Request : AggregateRoot
     }
 
     /// <summary>
-    /// The single entry point for every quote status change.
+    /// The single entry point for every quote status change. Legality and role checks are
+    /// entirely <see cref="QuoteTransitions"/>'s job; this method only applies the consequence of
+    /// an already-approved transition.
     /// </summary>
-    /// <remarks>
-    /// Legality and role permission are both resolved by <see cref="QuoteTransitions"/>, so this
-    /// method contains no <c>switch</c> over status and no role literal. The only behaviour that
-    /// lives here is the consequence of a transition, which is what actually needs the aggregate.
-    /// </remarks>
     public void ApplyQuoteAction(
         Guid quoteId,
         QuoteAction action,
@@ -266,9 +243,8 @@ public sealed class Request : AggregateRoot
             return;
         }
 
-        // Accepting is the one action with consequences beyond its own quote. Rejecting the live
-        // siblings and awarding the request happen here rather than in a handler so that they
-        // cannot be omitted by a caller and cannot land in a separate transaction.
+        // Rejecting live siblings and awarding the request happen here, not in a separate
+        // handler, so neither step can be skipped or land in a different transaction.
         const string superseded = "SupersededByAcceptedQuote";
 
         foreach (var sibling in _quotes)

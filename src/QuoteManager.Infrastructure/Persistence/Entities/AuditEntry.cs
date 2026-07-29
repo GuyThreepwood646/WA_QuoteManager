@@ -1,14 +1,9 @@
 namespace QuoteManager.Infrastructure.Persistence.Entities;
 
 /// <summary>
-/// One recorded fact about something a user did.
+/// One recorded fact about something a user did — a persistence-side projection of domain events
+/// (AD-5), not a domain concept, which is why it lives in Infrastructure.
 /// </summary>
-/// <remarks>
-/// Written in the same transaction as the change it describes, projected from the same domain
-/// events, so audit can't be skipped by a code path that forgot to log. This is a persistence-side
-/// record rather than a domain concept, which is why it lives in Infrastructure and the Domain
-/// knows nothing about it.
-/// </remarks>
 public sealed class AuditEntry
 {
     public Guid Id { get; init; }
@@ -30,11 +25,8 @@ public sealed class AuditEntry
     public DateTimeOffset OccurredAt { get; init; }
 
     /// <summary>
-    /// Correlates the audit row with the diagnostic trace for the same request.
+    /// Correlates the audit row with the diagnostic trace for the same request — audit and logging
+    /// stay separate sources of truth (AD-5); this is just the join key between them.
     /// </summary>
-    /// <remarks>
-    /// Audit and logging stay separate sources of truth; this is the join key that lets an
-    /// investigator move between them without making either depend on the other.
-    /// </remarks>
     public string? TraceId { get; init; }
 }

@@ -6,16 +6,10 @@ using QuoteManager.Application.Messaging;
 namespace QuoteManager.Infrastructure.Messaging;
 
 /// <summary>
-/// The Azure adapter for <see cref="IIntegrationEventPublisher"/>: selected only when
-/// <see cref="ServiceBusOptions.ConnectionString"/> is configured.
+/// The Azure adapter for <see cref="IIntegrationEventPublisher"/>, selected only when
+/// <see cref="ServiceBusOptions.ConnectionString"/> is configured. <see cref="ServiceBusMessage.MessageId"/>
+/// is set to the outbox row's own id, which is what Service Bus duplicate-detection keys on (AD-6).
 /// </summary>
-/// <remarks>
-/// <see cref="ServiceBusMessage.MessageId"/> is set to the outbox message's own id, so a consumer
-/// enabling Service Bus's duplicate-detection window gets exactly-once delivery for free within
-/// that window - required, not optional, given the outbox's at-least-once guarantee on the sending
-/// side. <see cref="ServiceBusMessage.Subject"/> carries the versioned contract name, so a
-/// consumer can dispatch without deserialising the body first.
-/// </remarks>
 public sealed class ServiceBusIntegrationEventPublisher(
     ServiceBusSender sender,
     ILogger<ServiceBusIntegrationEventPublisher> logger) : IIntegrationEventPublisher

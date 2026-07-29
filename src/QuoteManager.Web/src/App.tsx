@@ -15,10 +15,6 @@ import { OrganizationsPage } from './routes/OrganizationsPage'
 import { RequestDetailPage } from './routes/RequestDetailPage'
 import { RequestsListPage } from './routes/RequestsListPage'
 
-/**
- * Route table. `/login` renders standalone; every other path requires a session and renders
- * inside the application shell.
- */
 export function App() {
   return (
     <Routes>

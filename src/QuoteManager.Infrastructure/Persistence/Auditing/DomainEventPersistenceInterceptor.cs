@@ -12,20 +12,9 @@ namespace QuoteManager.Infrastructure.Persistence.Auditing;
 
 /// <summary>
 /// On every <see cref="QuoteManagerDbContext.SaveChangesAsync(CancellationToken)"/>, appends one
-/// <see cref="AuditEntry"/> per domain event and, for events on the integration allow-list, one
-/// <see cref="OutboxMessage"/> - both inside the same transaction as the change that raised them.
+/// <see cref="AuditEntry"/> per domain event and, for allow-listed events, one
+/// <see cref="OutboxMessage"/> — both inside the change's own transaction (AD-4, AD-5).
 /// </summary>
-/// <remarks>
-/// Combined into one interceptor deliberately, not split across two independently registered
-/// ones: both passes need to read the exact same in-memory event list before it is cleared, and
-/// relying on EF Core's interceptor invocation order for two separate classes to agree on who
-/// clears first would be exactly the kind of implicit coupling this design otherwise avoids.
-/// Translation itself still stays delegated - this class only reads once, hands each event to
-/// <see cref="IntegrationEventAllowList.Resolve"/>, and clears once. This is the only place that
-/// reads <see cref="AggregateRoot.DomainEvents"/> - use-case code never touches an event once it
-/// has been raised. Diagnostic logging (Serilog, OpenTelemetry) is a separate concern and is never
-/// the source either of these tables is built from.
-/// </remarks>
 public sealed class DomainEventPersistenceInterceptor(TimeProvider timeProvider) : SaveChangesInterceptor
 {
     public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
@@ -57,13 +46,9 @@ public sealed class DomainEventPersistenceInterceptor(TimeProvider timeProvider)
         var actorNames = await ResolveActorNamesAsync(context, events, cancellationToken);
         var traceId = Activity.Current?.TraceId.ToString();
 
-        // Request.ApplyQuoteAction can raise several events from one call (Accept, then a Reject per
-        // superseded sibling, then RequestAwarded) that share one DateTimeOffset, so minting each id from
-        // a fresh timeProvider.GetUtcNow() risks ties or even reversed order once two calls land in the
-        // same clock tick - silently breaking both the timeline's newest-first sort and the
-        // OutboxDispatcher's OrderBy(m => m.Id) delivery order. Guid.CreateVersion7 only encodes
-        // millisecond resolution (RFC 9562's 48-bit unix_ts_ms), so the offset must advance by whole
-        // milliseconds - not ticks - to actually change the timestamp field each id sorts on.
+        // Events raised in one call share one DateTimeOffset, so ids are minted from a single clock
+        // reading advanced by whole milliseconds each — Guid.CreateVersion7 only encodes millisecond
+        // resolution, and ties would scramble both the timeline sort and dispatch order (AD-5).
         var idClock = timeProvider.GetUtcNow();
         var nextIdOffsetMs = 0;
 
@@ -101,9 +86,9 @@ public sealed class DomainEventPersistenceInterceptor(TimeProvider timeProvider)
     }
 
     /// <summary>
-    /// Resolves the display name behind each acting id, including ids for <see cref="AppUser"/>
-    /// rows created earlier in this same unit of work - the seeder writes users and the requests
-    /// they act on in one <c>SaveChangesAsync</c> call, so those rows are not queryable yet.
+    /// Resolves the display name behind each acting id, including <see cref="AppUser"/> rows
+    /// created earlier in the same unit of work (not yet queryable) — the seeder writes users and
+    /// the requests they act on in one <c>SaveChangesAsync</c> call.
     /// </summary>
     private static async Task<Dictionary<Guid, string>> ResolveActorNamesAsync(
         QuoteManagerDbContext context,

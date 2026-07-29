@@ -1,13 +1,9 @@
 namespace QuoteManager.Infrastructure.Persistence.Entities;
 
 /// <summary>
-/// An integration event awaiting publication.
+/// An integration event awaiting publication — written in the same transaction as the state
+/// change it represents, and only for events on the AD-4 integration allow-list.
 /// </summary>
-/// <remarks>
-/// Written inside the same transaction as the state change, so a committed change always has its
-/// message and a rolled-back one never does. Only events on the integration allow-list land here —
-/// the queue carries effects that leave the process, not every internal state change.
-/// </remarks>
 public sealed class OutboxMessage
 {
     public Guid Id { get; init; }

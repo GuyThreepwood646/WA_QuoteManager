@@ -18,9 +18,7 @@ public sealed record ActivityEntryResponse(
     DateTimeOffset OccurredAt);
 
 /// <summary>
-/// The per-request activity timeline: reads <c>AuditEntry</c> directly for "what happened," laid
-/// out in one place instead of scattered across each screen re-deriving it from the entities it
-/// currently touches.
+/// The per-request activity timeline (AD-5): reads <c>AuditEntry</c> directly.
 /// </summary>
 public static class RequestActivityEndpoints
 {
@@ -46,12 +44,6 @@ public static class RequestActivityEndpoints
 
         var actor = currentUser.ToActor();
 
-        // Mirrors RequestEndpoints.GetRequestAsync exactly: a pure Vendor viewer must not learn a
-        // competitor's quote history - draft amounts, edits, withdrawals - through the timeline
-        // any more than through the quotes list itself. Every
-        // event whose SubjectType is Request (RequestCreated, VendorInvited, RequestAwarded,
-        // RequestCancelled) names no vendor and carries no money in its Summary, so it is always
-        // visible to anyone who can see the request at all; only Quote-subject rows need filtering.
         var visibleQuoteIds = RequestEndpoints.IsVendorOnlyView(actor)
             ? request.Quotes.Where(q => q.VendorOrganizationId == actor.OrganizationId).Select(q => q.Id).ToHashSet()
             : request.Quotes.Select(q => q.Id).ToHashSet();
@@ -63,9 +55,7 @@ public static class RequestActivityEndpoints
 
         var total = await baseQuery.CountAsync(cancellationToken);
 
-        // Newest first, per the list-query convention's default sort direction; Id (UUIDv7) breaks
-        // ties deterministically when two entries share the exact same second-precision timestamp,
-        // as several seeded actions on the same request do.
+        // Newest first; Id (UUIDv7) breaks ties when several seeded actions share a timestamp (AD-5).
         var rows = await baseQuery
             .OrderByDescending(e => e.OccurredAt)
             .ThenByDescending(e => e.Id)

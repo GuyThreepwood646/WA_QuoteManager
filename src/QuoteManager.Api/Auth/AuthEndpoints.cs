@@ -21,9 +21,8 @@ public static class AuthEndpoints
         // The one login contract the SPA's apiClient depends on. Anonymous by design.
         group.MapPost("/login", LoginAsync).AllowAnonymous();
 
-        // Lets the SPA's AuthProvider rehydrate identity after a page refresh without re-parsing
-        // the token client-side, and gives the anonymous-set test a protected route to assert 401
-        // against.
+        // Lets the SPA rehydrate identity after a page refresh, and gives the anonymous-set test a
+        // protected route to assert 401 against.
         group.MapGet("/me", (ICurrentUser currentUser) => Results.Ok(ToResponse(currentUser)));
     }
 

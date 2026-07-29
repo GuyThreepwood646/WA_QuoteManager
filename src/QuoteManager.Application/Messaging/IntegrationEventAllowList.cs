@@ -5,16 +5,11 @@ using QuoteManager.Domain.Requests;
 namespace QuoteManager.Application.Messaging;
 
 /// <summary>
-/// The single place that decides which domain events also leave the process as integration
-/// events, and the versioned, Domain-type-free shape each takes on the wire.
+/// The single place deciding which domain events also leave the process as integration events. A
+/// domain event absent here is still audited, just never queued. <see cref="QuoteStatusChanged"/>
+/// carries every quote transition, so it's pattern-matched on <c>To == QuoteStatus.Accepted</c>
+/// rather than allow-listed wholesale.
 /// </summary>
-/// <remarks>
-/// A domain event absent from <see cref="Resolve"/> is still written to the audit trail and
-/// nowhere else - the outbox carries out-of-boundary effects that another system needs to react to,
-/// not an undifferentiated firehose of every internal state change. <see cref="QuoteStatusChanged"/>
-/// carries every quote transition, not just acceptance, so it is pattern-matched on
-/// <c>To == QuoteStatus.Accepted</c> rather than allow-listed wholesale.
-/// </remarks>
 public static class IntegrationEventAllowList
 {
     public static IIntegrationEvent? Resolve(IDomainEvent domainEvent) => domainEvent switch

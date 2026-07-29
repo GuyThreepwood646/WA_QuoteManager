@@ -11,24 +11,12 @@ using QuoteManager.Infrastructure.Identity;
 namespace QuoteManager.Infrastructure.Persistence;
 
 /// <summary>
-/// Populates a demo database with data a reviewer can act on immediately.
+/// Populates a demo database with data a reviewer can act on immediately, modelled on Warehouse
+/// Anywhere's actual business: client companies needing storage across multiple markets, and a
+/// partner network of storage facilities, packers, and carriers responding with quotes — so
+/// "Vendor" here means a storage, packing, or freight partner, not a general contractor. Built
+/// through the aggregates rather than direct inserts, per AD-16.
 /// </summary>
-/// <remarks>
-/// Modelled on Warehouse Anywhere's actual business: client companies that need somewhere to store
-/// goods across multiple markets submit a request, and Warehouse Anywhere's partner network of
-/// storage facilities, packers and carriers respond with quotes. "Vendor" in this codebase is
-/// therefore a storage, packing or transportation partner, not a general contractor.
-///
-/// The seed is load-bearing rather than decoration. A triage dashboard over an empty database
-/// demonstrates nothing, and a reviewer who reaches a login screen holding no credentials cannot
-/// start at all. So this produces one account per role, quotes occupying <em>every</em> lifecycle
-/// state, one quote about to lapse, one request with competing quotes, and one request nobody has
-/// answered — each of which exists to make a specific screen say something true.
-///
-/// Everything is built through the aggregates rather than inserted directly, so the seeded data is
-/// necessarily legal under the transition table. A seeder writing rows straight to the database
-/// can fabricate states the domain would refuse, and then the demo is exercising a fiction.
-/// </remarks>
 public sealed class DemoDataSeeder(
     QuoteManagerDbContext context,
     IPasswordHasher<AppUser> passwordHasher,
@@ -53,10 +41,9 @@ public sealed class DemoDataSeeder(
         var now = timeProvider.GetUtcNow();
         var system = DomainActor.System;
 
-        // Two client companies drawn straight from Warehouse Anywhere's stated verticals
-        // (pharmaceutical sample management, retail/CPG), and three partner types representing the
-        // three services WA actually brokers: a storage facility, a packing/crating vendor, and a
-        // transportation/freight carrier.
+        // Two client companies drawn from Warehouse Anywhere's stated verticals (pharma sample
+        // management, retail/CPG) and three vendor types for the three services WA brokers:
+        // storage, packing/crating, and freight.
         var meridian = Organization.Create("Meridian Pharma Sampling", OrganizationKind.Client, system, now);
         var palmetto = Organization.Create("Palmetto Retail & CPG", OrganizationKind.Client, system, now);
         var secureBase = Organization.Create("SecureBase Self Storage", OrganizationKind.Vendor, system, now);
@@ -104,8 +91,8 @@ public sealed class DemoDataSeeder(
             crateworksActor, now.AddDays(-6));
         sampleStorage.ApplyQuoteAction(sampleStorageCrateworks.Id, QuoteAction.Submit, crateworksActor, now.AddDays(-6));
 
-        // A completed award. Accepting rejected the competing quote automatically, which is the
-        // single-accepted-quote invariant visible as history rather than described in a README.
+        // A completed award: accepting rejected the competing quote automatically (AD-3), visible
+        // here as history rather than described in a README.
         var tradeShow = Request.Create(
             "Trade show fixture storage & drayage — West Coast expo season",
             "Off-season storage of retail fixtures and displays, plus drayage coordination to three expo venues.",
@@ -154,8 +141,8 @@ public sealed class DemoDataSeeder(
             "Draft pending site visit — final crating and staging quote to follow.",
             crateworksActor, now.AddDays(-1));
 
-        // Nobody has responded at all. Without the invitation list this is indistinguishable from
-        // a request nobody was asked about, which is the distinction that makes it actionable.
+        // Nobody has responded — without the invitation list this would be indistinguishable from
+        // a request nobody was asked about.
         var coldChainPilot = Request.Create(
             "Cold-chain sample storage pilot — new territory launch",
             "Piloting a new sales territory; need a climate-controlled and refrigerated storage assessment before committing volume.",
@@ -210,9 +197,8 @@ public sealed class DemoDataSeeder(
             PasswordHash = string.Empty,
         };
 
-        // Hashed rather than stored, even for a throwaway demo account. A seeder is the most
-        // commonly copied file in a codebase, and a plaintext password here becomes a plaintext
-        // password in production by inheritance.
+        // Hashed even for a throwaway demo account: a seeder is the most commonly copied file in a
+        // codebase, and a plaintext password here becomes one in production by inheritance.
         user.PasswordHash = passwordHasher.HashPassword(user, DemoPassword);
         return user;
     }

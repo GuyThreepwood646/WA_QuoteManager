@@ -5,12 +5,6 @@ namespace QuoteManager.Api.Models;
 /// <summary>
 /// The body of <c>PUT /api/requests/{requestId}/quotes/{quoteId}</c>.
 /// </summary>
-/// <remarks>
-/// Every field is required, mirroring <see cref="CreateQuoteRequest"/> minus
-/// <see cref="CreateQuoteRequest.VendorOrganizationId"/>, which is immutable once a quote exists.
-/// Whether the caller may edit *this* quote at all - ownership, and that it's still in
-/// <c>Draft</c> - is decided entirely by <c>Request.EditQuote</c>; this type validates only shape.
-/// </remarks>
 public sealed record EditQuoteRequest : IValidatableObject
 {
     public required decimal Amount { get; init; }
@@ -36,7 +30,7 @@ public sealed record EditQuoteRequest : IValidatableObject
         if (!Currency.All(char.IsAsciiLetter))
         {
             yield return new ValidationResult(
-                "currency must be a three-letter ISO-4217 code.",
+                "currency must be a written in ASCII letters.",
                 [nameof(Currency)]);
         }
     }

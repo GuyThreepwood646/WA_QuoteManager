@@ -1,9 +1,5 @@
 import { QueryClient } from '@tanstack/react-query'
 
-/**
- * TanStack Query owns all server state: nothing fetched from the API is mirrored into component
- * state, so there is exactly one copy of the truth on the client.
- */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

@@ -16,9 +16,8 @@ using QuoteManager.Infrastructure.Persistence;
 using Scalar.AspNetCore;
 using Serilog;
 
-// Serilog is configured twice on purpose. This first, minimal logger exists only so that a crash
-// during start-up — a bad connection string, a failed migration — is still recorded somewhere
-// instead of vanishing. It is replaced by the fully configured logger once configuration is read.
+// This bootstrap logger exists only so a start-up crash - a bad connection string, a failed
+// migration - is still recorded before the fully configured logger takes over.
 Log.Logger = TelemetryConfiguration.CreateBootstrapLogger();
 
 try
@@ -28,9 +27,8 @@ try
     builder.Host.UseSerilog((context, services, configuration) =>
         TelemetryConfiguration.Configure(configuration, context.Configuration, context.HostingEnvironment));
 
-    // Telemetry is OpenTelemetry-native. Azure Monitor is one exporter, attached only when its
-    // connection string is present, so the absence of an Azure subscription is a supported
-    // configuration rather than a start-up failure.
+    // Azure Monitor is an exporter swap on the same OpenTelemetry pipeline, gated on its
+    // connection string being present (AD-6).
     var azureMonitorConnectionString = builder.Configuration["AzureMonitor:ConnectionString"];
     if (!string.IsNullOrWhiteSpace(azureMonitorConnectionString))
     {
@@ -45,9 +43,8 @@ try
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
     builder.Services.AddSingleton<TokenService>();
 
-    // Exactly one authentication scheme, JWT bearer, HS256. A fallback authorisation policy
-    // requires an authenticated user for every endpoint, so protection is the default and
-    // anonymity is opt-in via explicit AllowAnonymous() calls below.
+    // Exactly one auth scheme, JWT bearer; the fallback policy below requires an authenticated
+    // user everywhere, so anonymity is explicit opt-in via AllowAnonymous() calls (AD-9).
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         .AddJwtBearer(options =>
         {
@@ -69,25 +66,18 @@ try
             .RequireAuthenticatedUser()
             .Build());
 
-    // Actions cross the wire as readable names (e.g. "StartReview"), not the ordinal a default
-    // JSON enum converter would emit, since the UI maps permittedActions to controls by comparing
-    // these strings against QuoteAction.
     builder.Services.ConfigureHttpJsonOptions(options =>
         options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
     builder.Services.AddOpenApi();
 
-    // Shape/format validation for every request body. Each type in Api/Models implements
-    // IValidatableObject; AddValidation wires the source-generated interceptor (see
-    // InterceptorsNamespaces in QuoteManager.Api.csproj) that runs DataAnnotations attributes, then
-    // Validate(), before a handler ever sees the model. A failure short-circuits straight to a 400
-    // ProblemDetails with per-field errors - no endpoint code, and no DomainExceptionHandler
-    // involvement.
+    // AddValidation wires the source-generated interceptor that runs DataAnnotations then
+    // Validate() before a handler runs; a failure short-circuits to 400 without reaching
+    // DomainExceptionHandler (AD-8).
     builder.Services.AddValidation();
 
-    // Every error leaves the process as RFC 9457 problem details. DomainExceptionHandler maps
-    // typed domain violations to their stable code and status first; AddProblemDetails is what
-    // lets it (and the fallback handler for anything unmapped) actually write the response.
+    // DomainExceptionHandler maps domain violations to their stable code first; AddProblemDetails
+    // covers everything else, per AD-8.
     builder.Services.AddExceptionHandler<DomainExceptionHandler>();
     builder.Services.AddProblemDetails();
 
@@ -95,9 +85,7 @@ try
 
     var app = builder.Build();
 
-    // Migrations and the demo seed run before the first request is served, so a reviewer who
-    // clones the repository and runs one command lands on a populated application rather than an
-    // empty one they have no credentials to fill.
+    // Seeds the demo data before the first request, so a fresh clone starts populated (AD-16).
     await using (var scope = app.Services.CreateAsyncScope())
     {
         var initializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
@@ -112,21 +100,14 @@ try
     app.UseExceptionHandler();
     app.UseStatusCodePages();
 
-    // Serves the built React bundle from wwwroot so a Release run is a single process on a single
-    // origin — no CORS configuration, no second server to start during a demo. In development the
-    // Vite dev server proxies to this host instead, so the browser still sees one origin.
-    // Positioned ahead of authentication/authorisation, not just given AllowAnonymous() below: the
-    // authorisation middleware applies the deny-by-default fallback policy to *every* request that
-    // reaches it, including ones bound for a static file that never resolves to a routed endpoint,
-    // so a physical asset request would 401 before UseStaticFiles ever got a chance to serve it.
+    // Must precede UseAuthentication/UseAuthorization (AD-9's own note on why).
     app.UseDefaultFiles();
     app.UseStaticFiles();
 
     app.UseAuthentication();
     app.UseAuthorization();
 
-    // The complete anonymous set: login, health, the OpenAPI document, the Scalar reference UI,
-    // and the SPA fallback route. Everything else is protected by the fallback policy above.
+    // The complete anonymous set (AD-9): login, health, OpenAPI, Scalar, and the SPA fallback.
     app.MapOpenApi().AllowAnonymous();
     if (app.Environment.IsDevelopment())
     {

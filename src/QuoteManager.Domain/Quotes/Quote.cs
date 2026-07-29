@@ -3,14 +3,10 @@ using QuoteManager.Domain.Common;
 namespace QuoteManager.Domain.Quotes;
 
 /// <summary>
-/// A vendor's offer against a request.
+/// A vendor's offer against a request. Deliberately not an aggregate root: enforcing "at most one
+/// accepted quote" requires seeing every sibling, so <c>Request</c> is the consistency boundary
+/// and every mutating method here is internal.
 /// </summary>
-/// <remarks>
-/// Deliberately not an aggregate root. Accepting a quote has to see every sibling quote to
-/// enforce "at most one accepted", so <c>Request</c> owns the quotes and is the consistency
-/// boundary. Every mutating method here is internal — the only way to change a quote is through
-/// its parent request.
-/// </remarks>
 public sealed class Quote : Entity
 {
     private Quote(
@@ -47,13 +43,9 @@ public sealed class Quote : Entity
     public Money Amount { get; private set; }
 
     /// <summary>
-    /// When the offer lapses, or null if it does not.
+    /// When the offer lapses, or null if it does not. Stored rather than swept by a background
+    /// job — the dashboard reads it directly to surface proximity to expiry.
     /// </summary>
-    /// <remarks>
-    /// Stored rather than swept by a background service: the dashboard projections read it to
-    /// surface proximity to expiry, so expiry is equally visible without a hosted service and
-    /// its attendant transactional and idempotency questions.
-    /// </remarks>
     public DateTimeOffset? ExpiresAt { get; private set; }
 
     public string? Notes { get; private set; }

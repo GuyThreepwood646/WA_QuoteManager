@@ -1,12 +1,9 @@
 namespace QuoteManager.Domain.Common;
 
 /// <summary>
-/// A refused business operation, carrying a stable machine code.
+/// A refused business operation. <see cref="Code"/> crosses the wire as the problem details
+/// <c>code</c> extension and is the only thing the UI should branch on — the message is not a contract.
 /// </summary>
-/// <remarks>
-/// <see cref="Code"/> is what crosses the wire as the problem details <c>code</c> extension, and
-/// it's the only thing the UI should ever branch on — it's a public contract, unlike the message.
-/// </remarks>
 public abstract class DomainException(string message) : Exception(message)
 {
     public abstract string Code { get; }

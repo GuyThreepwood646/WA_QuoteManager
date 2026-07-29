@@ -128,6 +128,24 @@ public sealed class RequestAggregateTests
     }
 
     [Fact]
+    public void A_requester_whose_organization_id_matches_the_target_still_cannot_draft_a_quote()
+    {
+        // Organization id is not exclusive to Vendor accounts - a Requester or Reviewer can carry
+        // one too. CanActForVendorOrganization alone only compares ids, so without a role check
+        // this actor's own organization id happening to equal vendorOrganizationId would otherwise
+        // be enough to plant a quote despite holding no Vendor capability at all.
+        var request = NewRequest();
+        var requesterAtVendorOrgA = new DomainActor(
+            Guid.Parse("55555555-5555-5555-5555-555555555555"), "Riley", AppRole.Requester, VendorOrgA);
+
+        Should.Throw<QuoteTransitionNotAllowedException>(() =>
+                request.AddQuote(VendorOrgA, new Money(1000m, "USD"), null, null, requesterAtVendorOrgA, Now))
+            .BlockedByRole.ShouldBeTrue();
+
+        request.Quotes.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void A_quote_cannot_be_edited_once_submitted()
     {
         var request = NewRequest();

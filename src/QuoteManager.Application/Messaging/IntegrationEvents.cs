@@ -3,13 +3,9 @@ using System.Text.Json.Serialization;
 namespace QuoteManager.Application.Messaging;
 
 /// <summary>
-/// A versioned contract that may leave the process as an integration event.
+/// A versioned contract that may leave the process as an integration event — its own type, never
+/// a reused Domain type, so a Domain-internal change can't silently break an outside consumer.
 /// </summary>
-/// <remarks>
-/// Deliberately its own type per event, never a Domain type reused across the boundary - a
-/// Domain-internal rename or field addition must not silently change what a consumer outside the
-/// process already depends on.
-/// </remarks>
 public interface IIntegrationEvent
 {
     /// <summary>Stable, versioned name a consumer dispatches on, e.g. <c>QuoteAccepted.v1</c>.</summary>

@@ -476,6 +476,8 @@ it isn't editable once a request exists.
 - `404` — request not found.
 - `409` with `code: "request.not_editable"` — a quote has already progressed past `Draft`, or the
   request is `Awarded`/`Cancelled`.
+- `409` with `code: "concurrency.conflict"` — the request changed between read and write (EF's own
+  version token, not an explicit `If-Match` round-trip like quotes use).
 
 #### `POST /api/requests/{requestId}/cancel`
 
@@ -492,6 +494,7 @@ can't be called off this way.
 - `403` with `code: "request.action_not_permitted_for_role"` — caller isn't Requester or Admin.
 - `404` — request not found.
 - `409` with `code: "request.not_editable"` — the request is already `Awarded`.
+- `409` with `code: "concurrency.conflict"` — the request changed between read and write.
 
 **Business logic:** cancelling an already-cancelled request is a no-op, not an error — the same
 idempotent shape `InviteVendor` (below) uses for a duplicate invite.
@@ -793,6 +796,7 @@ records depend on.
 - `403` with `code: "organization.action_not_permitted_for_role"` — caller isn't an Admin.
 - `404` — organization not found.
 - `409` with `code: "organization.duplicate_name"` — another organization already has this name.
+- `409` with `code: "concurrency.conflict"` — the organization changed between read and write.
 
 #### `POST /api/organizations/{organizationId}/retire`
 

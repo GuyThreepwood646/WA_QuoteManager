@@ -89,6 +89,23 @@ public sealed class AnonymousEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task Logging_in_with_an_unknown_email_returns_the_same_401_code_as_a_wrong_password()
+    {
+        // Same code and same generic message either way, so a caller can't distinguish "no such
+        // account" from "wrong password" from the response body alone.
+        var response = await _client.PostAsJsonAsync(
+            "/api/auth/login",
+            new { email = "no-such-account@warehouseanywhere.test", password = "whatever" },
+            TestContext.Current.CancellationToken);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetailsBody>(TestContext.Current.CancellationToken);
+        problem.ShouldNotBeNull();
+        problem.Code.ShouldBe("auth.invalid_credentials");
+    }
+
+    [Fact]
     public async Task Logging_in_with_a_missing_password_is_rejected_as_a_validation_problem_naming_the_field()
     {
         var response = await _client.PostAsJsonAsync(

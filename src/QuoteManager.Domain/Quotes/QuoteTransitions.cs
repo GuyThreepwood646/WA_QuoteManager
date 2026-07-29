@@ -4,13 +4,9 @@ namespace QuoteManager.Domain.Quotes;
 
 /// <summary>
 /// One legal move: from a state, by an action, to a state, permitted to a set of roles.
+/// <paramref name="IsVendorGated"/> marks Vendor-side rows that also require organization
+/// ownership, since a role check alone can't express "this vendor, not any vendor".
 /// </summary>
-/// <remarks>
-/// <paramref name="IsVendorGated"/> marks rows whose <see cref="PermittedRoles"/> is the Vendor
-/// side of the table. A Vendor may only act on its own organization's quotes, and a role check
-/// alone can't express "this vendor, not any vendor" — so these rows carry an extra
-/// organization-matching requirement that Reviewer/Admin-only rows don't need.
-/// </remarks>
 public sealed record QuoteTransition(
     QuoteStatus From,
     QuoteAction Action,
@@ -19,14 +15,9 @@ public sealed record QuoteTransition(
     bool IsVendorGated);
 
 /// <summary>
-/// The single authority on the quote lifecycle.
+/// The single authority on the quote lifecycle — nothing else (e.g. a route-level role attribute)
+/// may independently decide whether an action is legal, or the two could drift apart.
 /// </summary>
-/// <remarks>
-/// Both the API's authorisation check and the permitted-action set projected to the client call
-/// <see cref="PermittedFor"/>. Nothing else may decide whether an action is legal: a second
-/// opinion expressed as an <c>[Authorize(Roles = "...")]</c> attribute on a transition endpoint
-/// would let the UI offer actions the API refuses, and the two would quietly drift apart over time.
-/// </remarks>
 public static class QuoteTransitions
 {
     private const AppRole VendorSide = AppRole.Vendor | AppRole.Admin;
@@ -76,14 +67,9 @@ public static class QuoteTransitions
     }
 
     /// <summary>
-    /// Resolves an attempted action, distinguishing "illegal from this state" from
-    /// "legal but not for this actor".
+    /// Resolves an attempted action, distinguishing "illegal from this state" (409: the world
+    /// moved on) from "legal but not for this actor" (403: find a colleague).
     /// </summary>
-    /// <remarks>
-    /// The distinction is not cosmetic: the first is a 409 telling the user the world moved on,
-    /// the second a 403 telling them to find a colleague. Collapsing them would make both
-    /// misleading.
-    /// </remarks>
     public static TransitionResolution Resolve(QuoteStatus status, QuoteAction action, DomainActor actor, Guid vendorOrganizationId)
     {
         foreach (var transition in Table)
@@ -113,8 +99,7 @@ public static class QuoteTransitions
             return false;
         }
 
-        // Role alone cannot tell one vendor from another. Ownership lives on DomainActor so both
-        // gates that need it - this table and Request.AddQuote - ask the same question.
+        // Role alone can't tell one vendor from another; ownership is DomainActor's job.
         return !transition.IsVendorGated || actor.CanActForVendorOrganization(vendorOrganizationId);
     }
 }

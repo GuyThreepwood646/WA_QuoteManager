@@ -3,14 +3,11 @@ using Microsoft.Extensions.Logging;
 namespace QuoteManager.Infrastructure.Persistence;
 
 /// <summary>
-/// Source-generated log messages for start-up and seeding.
+/// Source-generated log messages for start-up and seeding, via the <c>LoggerMessage</c> generator
+/// for pre-compiled delegates with the enabled-check built in. Written as static methods taking
+/// the logger explicitly because the generator cannot see one captured as a primary-constructor
+/// parameter.
 /// </summary>
-/// <remarks>
-/// The <c>LoggerMessage</c> generator produces strongly typed, pre-compiled delegates with the
-/// enabled-check built in, so an argument is never formatted or boxed for a log level that is
-/// switched off. Written as static methods taking the logger explicitly because the generator
-/// cannot see a logger captured as a primary-constructor parameter.
-/// </remarks>
 internal static partial class PersistenceLog
 {
     [LoggerMessage(

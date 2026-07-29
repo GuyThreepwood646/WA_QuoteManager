@@ -1,10 +1,7 @@
 import { getSession, setSession } from '../auth/authSession'
 import { queryClient } from './queryClient'
 
-/**
- * A refused request, carrying the RFC 9457 `code` extension the UI is allowed to branch on -
- * never the human-readable `detail`, which can be reworded without notice.
- */
+/** A refused request, carrying the RFC 9457 `code` extension the UI branches on, not the human-readable `detail`. */
 export class ApiError extends Error {
   readonly status: number
   readonly code: string | undefined
@@ -46,9 +43,8 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   })
 
-  // A 401 with no session attached is the endpoint's own answer (e.g. a bad login attempt) and
-  // carries its own problem-details code - it is not this client losing an authenticated session,
-  // so it falls through to the generic error handling below rather than being reinterpreted here.
+  // A 401 with no session attached is the endpoint's own answer (e.g. bad login credentials), not
+  // this client losing a session, so it falls through to the generic error handling below.
   if (response.status === 401 && session) {
     setSession(null)
     queryClient.clear()
@@ -78,11 +74,7 @@ async function tryParseProblemDetails(response: Response): Promise<ProblemDetail
   }
 }
 
-/**
- * The one place in the SPA a network request originates. Every resource module - `auth`,
- * `quotes`, and whatever follows - calls through here rather than touching `fetch` directly; the
- * oxlint `no-restricted-globals` rule makes that a build failure, not just a convention.
- */
+/** The one place in the SPA a network request originates; oxlint's `no-restricted-globals` rule enforces it. */
 export const apiClient = {
   get: <T>(path: string): Promise<T> => request<T>(path),
   post: <T>(path: string, body?: unknown, headers?: Record<string, string>): Promise<T> =>

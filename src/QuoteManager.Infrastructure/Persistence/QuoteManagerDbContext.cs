@@ -28,8 +28,8 @@ public sealed class QuoteManagerDbContext(DbContextOptions<QuoteManagerDbContext
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
-        // Applied as a convention rather than per property so that no future timestamp can be added
-        // in the unsortable default form and quietly break date filtering on that column alone.
+        // Convention rather than per-property, so a future timestamp can't reintroduce the
+        // unsortable default form (AD-17).
         configurationBuilder.Properties<DateTimeOffset>()
             .HaveConversion<UtcDateTimeOffsetConverter>();
 

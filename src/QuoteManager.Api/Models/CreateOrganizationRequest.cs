@@ -6,11 +6,6 @@ namespace QuoteManager.Api.Models;
 /// <summary>
 /// The body of <c>POST /api/organizations</c>.
 /// </summary>
-/// <remarks>
-/// Whether the caller may create an organization at all is decided entirely by
-/// <c>Organization.Create</c>; this type validates only shape. Whether the name is already taken
-/// needs a database lookup and so is checked in the endpoint, not here.
-/// </remarks>
 public sealed record CreateOrganizationRequest : IValidatableObject
 {
     [Required]

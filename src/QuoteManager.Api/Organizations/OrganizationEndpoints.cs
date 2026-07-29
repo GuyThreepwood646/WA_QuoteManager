@@ -54,8 +54,6 @@ public static class OrganizationEndpoints
             return DuplicateNameProblem();
         }
 
-        // Throws OrganizationActionNotPermittedException for a non-Admin caller - the
-        // DomainExceptionHandler maps it to 403, so no role check belongs here.
         var organization = Organization.Create(trimmedName, body.Kind, currentUser.ToActor(), timeProvider.GetUtcNow());
         db.Organizations.Add(organization);
 

@@ -3,12 +3,9 @@ using System.Globalization;
 namespace QuoteManager.Domain.Common;
 
 /// <summary>
-/// A monetary amount and its ISO-4217 currency.
+/// A monetary amount and its ISO-4217 currency, travelling together so a bare number can never
+/// be compared or summed across currencies by accident.
 /// </summary>
-/// <remarks>
-/// Amount is <see cref="decimal"/> and never a floating-point type, and the currency travels
-/// with it so a bare number can never be compared or summed across currencies by accident.
-/// </remarks>
 public readonly record struct Money
 {
     public Money(decimal amount, string currencyCode)
@@ -22,7 +19,7 @@ public readonly record struct Money
 
         if (currencyCode.Length != 3)
         {
-            throw new ArgumentException("Currency must be a three-letter ISO-4217 code.", nameof(currencyCode));
+            throw new ArgumentException("currency must be a written in ASCII letters.", nameof(currencyCode));
         }
 
         Amount = decimal.Round(amount, 2, MidpointRounding.ToEven);

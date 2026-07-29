@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using QuoteManager.Application.Abstractions;
-using QuoteManager.Domain.Identity;
 using QuoteManager.Domain.Quotes;
 using QuoteManager.Domain.Requests;
 using QuoteManager.Infrastructure.Persistence;
@@ -33,14 +32,8 @@ public sealed record DashboardResponse(
     IReadOnlyList<QuoteTriageItem> QuotesExpiringSoon,
     IReadOnlyList<RequestAwaitingResponseItem> RequestsAwaitingResponse);
 
-/// <summary>
-/// "See what's happening, focus on the right work" - a triage/prioritisation surface, not a CRUD
-/// grid. Every bucket here answers a specific question a user actually has, rather than being a
-/// filtered view of one big list.
-/// </summary>
 public static class DashboardEndpoints
 {
-    /// <summary>How close to expiry counts as "soon" for the triage view.</summary>
     private static readonly TimeSpan ExpirySoonWindow = TimeSpan.FromDays(3);
 
     public static void MapDashboardEndpoints(this IEndpointRouteBuilder endpoints)
@@ -57,10 +50,8 @@ public static class DashboardEndpoints
         var now = timeProvider.GetUtcNow();
         var actor = currentUser.ToActor();
 
-        // One AsNoTracking projection joining Quotes/Requests/Organizations by id (there's no
-        // navigation property between them - Quote deliberately carries no VendorOrganization
-        // reference). permittedActions is computed after materialising, since
-        // QuoteTransitions.PermittedFor is plain C# and can't translate to SQL.
+        // permittedActions is computed after materialising, since QuoteTransitions.PermittedFor is
+        // plain C# and can't translate to SQL.
         var quoteRows = await (
             from quote in db.Quotes.AsNoTracking()
             join request in db.Requests.AsNoTracking() on quote.RequestId equals request.Id

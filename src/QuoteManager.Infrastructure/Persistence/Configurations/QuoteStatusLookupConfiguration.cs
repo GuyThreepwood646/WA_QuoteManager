@@ -18,9 +18,8 @@ public sealed class QuoteStatusLookupConfiguration : IEntityTypeConfiguration<Qu
             .HasConversion<string>()
             .HasMaxLength(32);
 
-        // Seeded into the migration rather than by the application seeder. The Quotes.Status
-        // foreign key depends on these rows existing, so a database created by `dotnet ef database
-        // update` alone — with the app never started — must already be valid.
+        // Seeded into the migration, not the application seeder: the Quotes.Status foreign key
+        // depends on these rows existing even before the app has ever started.
         builder.HasData(Enum.GetValues<QuoteStatus>().Select(status => new QuoteStatusLookup
         {
             Status = status,
