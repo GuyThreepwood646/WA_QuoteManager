@@ -18,7 +18,7 @@ export function RequestsListPage() {
     queryFn: () => listRequests(),
   })
 
-  // Mirrors the API's own gate on Request.Create (AD-13): only who could succeed sees the button.
+  // Mirrors the API's own gate on Request.Create: only who could succeed sees the button.
   const canCreateRequest = session?.user.roles.some((role) => role === 'Requester' || role === 'Admin') ?? false
 
   if (isPending) {

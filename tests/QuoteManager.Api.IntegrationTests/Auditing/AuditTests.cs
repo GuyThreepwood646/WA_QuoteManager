@@ -11,7 +11,7 @@ using QuoteManager.Infrastructure.Persistence;
 namespace QuoteManager.Api.IntegrationTests.Auditing;
 
 /// <summary>
-/// Proves AD-5: every domain event raised while building the seed graph lands as an
+/// Proves that every domain event raised while building the seed graph lands as an
 /// <see cref="QuoteManager.Infrastructure.Persistence.Entities.AuditEntry"/> in the same
 /// transaction, with the actor resolved correctly whether it is the system sentinel, a user
 /// created earlier in the very same save, or an existing user acting through the API.
@@ -34,7 +34,7 @@ public sealed class AuditTests : IDisposable
 
         entries.ShouldNotBeEmpty();
 
-        // The five organisations are created with the DomainActor.System sentinel (AD-10), before
+        // The five organisations are created with the DomainActor.System sentinel, before
         // any user account exists to attribute them to - the case ActorDisplayName resolution
         // must not silently get wrong just because there is no row to look up yet.
         entries.Count(e => e.Action == "OrganizationCreated" && e.ActorDisplayName == "System")

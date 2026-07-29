@@ -17,10 +17,10 @@ const selectClassName =
   'h-9 w-full min-w-0 rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:bg-input/30'
 
 /**
- * FR-1's create side. Raising a request is a Requester/Admin action (AD-13's client-side gate on
- * <c>Request.Create</c>) - a Vendor who reaches this page by URL still gets a form, but submitting
- * it surfaces the API's 403 rather than the page pretending the action does not exist, which would
- * only hide the same rule one layer up.
+ * Raising a request is a Requester/Admin action, mirroring the same gate on <c>Request.Create</c>
+ * - a Vendor who reaches this page by URL still gets a form, but submitting it surfaces the API's
+ * 403 rather than the page pretending the action doesn't exist, which would only hide the same
+ * rule one layer up.
  */
 export function NewRequestPage() {
   const navigate = useNavigate()

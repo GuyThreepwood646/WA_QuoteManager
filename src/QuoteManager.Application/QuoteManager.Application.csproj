@@ -4,7 +4,7 @@
     <ProjectReference Include="..\QuoteManager.Domain\QuoteManager.Domain.csproj" />
   </ItemGroup>
 
-  <!-- AD-1: no Microsoft.EntityFrameworkCore.*, Microsoft.AspNetCore.* or Azure.* here.
+  <!-- No Microsoft.EntityFrameworkCore.*, Microsoft.AspNetCore.* or Azure.* here.
        Only abstractions the use cases genuinely need to declare their ports and be wired up. -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />

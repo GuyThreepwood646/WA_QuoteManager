@@ -15,7 +15,7 @@ const statusStyles: Record<string, string> = {
 }
 
 /**
- * The one place a lifecycle status becomes a colour (AD-7's spirit extended to styling): every
+ * The one place a lifecycle status becomes a colour: every
  * screen that shows a quote or request status renders it through here, so a status never gets a
  * one-off colour decided in the component that happens to need it that day.
  */

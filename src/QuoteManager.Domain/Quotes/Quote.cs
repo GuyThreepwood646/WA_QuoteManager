@@ -6,10 +6,10 @@ namespace QuoteManager.Domain.Quotes;
 /// A vendor's offer against a request.
 /// </summary>
 /// <remarks>
-/// Deliberately not an aggregate root. Acceptance has to see every sibling quote to enforce the
-/// single-accepted invariant, so <c>Request</c> owns the quotes and is the consistency boundary
-/// (AD-3). Every mutating method here is therefore internal: the only public route to changing a
-/// quote is through its parent request.
+/// Deliberately not an aggregate root. Accepting a quote has to see every sibling quote to
+/// enforce "at most one accepted", so <c>Request</c> owns the quotes and is the consistency
+/// boundary. Every mutating method here is internal — the only way to change a quote is through
+/// its parent request.
 /// </remarks>
 public sealed class Quote : Entity
 {

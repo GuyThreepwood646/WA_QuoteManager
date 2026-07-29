@@ -20,9 +20,8 @@ public abstract class AggregateRoot
     /// Incremented on every state change and mapped as an EF concurrency token.
     /// </summary>
     /// <remarks>
-    /// AD-15: SQLite has no <c>rowversion</c>, so EF Core cannot supply a token automatically
-    /// on this provider. An explicit integer is the substitute, which is why callers must never
-    /// reach for <c>IsRowVersion()</c>.
+    /// SQLite has no <c>rowversion</c> type, so EF can't generate this for us — hence a plain
+    /// integer instead of <c>IsRowVersion()</c>.
     /// </remarks>
     public int Version { get; private set; }
 

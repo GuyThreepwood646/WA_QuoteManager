@@ -6,8 +6,9 @@
   </PropertyGroup>
 
   <!-- References every production project so their assemblies land in the output folder and can
-       be reflected over. These tests enforce AD-1 mechanically; no third-party architecture-test
-       library is needed, since Assembly.GetReferencedAssemblies is sufficient. -->
+       be reflected over. These tests enforce the dependency direction mechanically; no
+       third-party architecture-test library is needed, since Assembly.GetReferencedAssemblies is
+       sufficient. -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\QuoteManager.Domain\QuoteManager.Domain.csproj" />
     <ProjectReference Include="..\..\src\QuoteManager.Application\QuoteManager.Application.csproj" />

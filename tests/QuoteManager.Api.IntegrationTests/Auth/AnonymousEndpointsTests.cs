@@ -7,7 +7,7 @@ using QuoteManager.Infrastructure.Persistence;
 namespace QuoteManager.Api.IntegrationTests.Auth;
 
 /// <summary>
-/// Enforces AD-9's complete anonymous set as a test rather than prose: exactly the SPA fallback,
+/// Enforces the complete anonymous set as a test rather than prose: exactly the SPA fallback,
 /// health, and the OpenAPI document are reachable without a token, and everything else is not.
 /// </summary>
 public sealed class AnonymousEndpointsTests : IDisposable
@@ -36,7 +36,7 @@ public sealed class AnonymousEndpointsTests : IDisposable
     {
         var response = await _client.GetAsync(path, TestContext.Current.CancellationToken);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK, $"{path} is in AD-9's enumerated anonymous set");
+        response.StatusCode.ShouldBe(HttpStatusCode.OK, $"{path} is in the enumerated anonymous set");
     }
 
     [Fact]
@@ -123,6 +123,6 @@ public sealed class AnonymousEndpointsTests : IDisposable
     /// <summary>Reads only the field this test cares about, since <c>ProblemDetails.Extensions</c> is dynamic.</summary>
     private sealed record ProblemDetailsBody(string Code);
 
-    /// <summary>The shape of the 400 the built-in minimal API validation (AD-8) returns.</summary>
+    /// <summary>The shape of the 400 the built-in minimal API validation returns.</summary>
     private sealed record ValidationProblemBody(Dictionary<string, string[]> Errors);
 }

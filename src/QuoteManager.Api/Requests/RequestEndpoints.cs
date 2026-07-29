@@ -54,9 +54,9 @@ public sealed record RequestDetailResponse(
     IReadOnlyList<RequestInvitationItem> Invitations);
 
 /// <summary>
-/// FR-1/FR-2: browsing and drilling into requests. The list is intentionally thin (AD-11 - no
-/// aggregate fields the list screen does not use); the detail response is where a user actually
-/// acts, via the quote transition endpoint and each quote's <c>permittedActions</c> (AD-7).
+/// Browsing and drilling into requests. The list is intentionally thin - no aggregate fields the
+/// list screen doesn't use; the detail response is where a user actually acts, via the quote
+/// transition endpoint and each quote's <c>permittedActions</c>.
 /// </summary>
 public static class RequestEndpoints
 {
@@ -105,9 +105,8 @@ public static class RequestEndpoints
     }
 
     /// <summary>
-    /// FR-1's other half: raising a request. <c>Request.Create</c> is the sole authority on
-    /// whether the actor's role permits it (AD-13's client-side mirror), so a role check here
-    /// would only be a second, driftable copy of that rule.
+    /// Raising a request. <c>Request.Create</c> is the sole authority on whether the actor's role
+    /// permits it, so a role check here would only be a second, driftable copy of that rule.
     /// </summary>
     private static async Task<IResult> CreateRequestAsync(
         CreateRequestRequest body,
@@ -129,7 +128,7 @@ public static class RequestEndpoints
         }
 
         // Throws RequestCreationNotPermittedException for a Vendor/Reviewer caller; the
-        // DomainExceptionHandler maps it to 403 (AD-8), so no role check belongs here.
+        // DomainExceptionHandler maps it to 403, so no role check belongs here.
         var request = Request.Create(
             body.Title,
             body.Description,
@@ -176,8 +175,8 @@ public static class RequestEndpoints
 
         var actor = currentUser.ToActor();
 
-        // Read-side half of AD-13: Admin/Reviewer/Requester are the client side of a request and
-        // need every quote to compare offers, so they see everything. A pure Vendor account acts on
+        // Admin/Reviewer/Requester are the client side of a request and need every quote to
+        // compare offers, so they see everything. A pure Vendor account acts on
         // only its own organisation's quote (write side, already enforced by QuoteTransitions) and
         // must not be able to read a competitor's amount, notes, or even the fact that a competing
         // quote or invitation exists on a shared request - visibility is filtered to match.
@@ -244,7 +243,7 @@ public static class RequestEndpoints
         actor.Roles.HasAny(AppRole.Vendor) && !actor.Roles.HasAny(AppRole.Admin | AppRole.Reviewer | AppRole.Requester);
 
     /// <summary>
-    /// AD-7's request-level counterpart to a quote's <c>permittedActions</c>: whether this viewer
+    /// The request-level counterpart to a quote's <c>permittedActions</c>: whether this viewer
     /// should be shown a form to draft a new quote on this request. Scoped to the vendor
     /// self-serve path only - Admin can still call the create-quote endpoint on behalf of any
     /// vendor, but that is a support action with no dedicated screen, not a signal this field

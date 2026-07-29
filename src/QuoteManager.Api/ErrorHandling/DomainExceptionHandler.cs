@@ -8,9 +8,9 @@ using QuoteManager.Domain.Common;
 namespace QuoteManager.Api.ErrorHandling;
 
 /// <summary>
-/// AD-8: maps typed domain exceptions to RFC 9457 problem details carrying a stable machine
-/// <c>code</c> and the active trace id, so endpoint handlers never need a <c>try</c>/<c>catch</c>
-/// for a domain rule violation.
+/// Maps typed domain exceptions to RFC 9457 problem details carrying a stable machine <c>code</c>
+/// and the active trace id, so endpoint handlers never need a <c>try</c>/<c>catch</c> for a domain
+/// rule violation.
 /// </summary>
 public sealed class DomainExceptionHandler(IProblemDetailsService problemDetailsService) : IExceptionHandler
 {

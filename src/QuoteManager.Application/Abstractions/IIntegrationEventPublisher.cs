@@ -3,7 +3,7 @@ using QuoteManager.Application.Messaging;
 namespace QuoteManager.Application.Abstractions;
 
 /// <summary>
-/// The one port, per AD-6, by which an integration event actually leaves the process.
+/// The one port by which an integration event actually leaves the process.
 /// </summary>
 /// <remarks>
 /// Exactly two adapters exist: an in-process channel used by default, and an Azure Service Bus

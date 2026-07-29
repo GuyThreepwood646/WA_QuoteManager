@@ -8,9 +8,9 @@ namespace QuoteManager.Api.Observability;
 /// <summary>
 /// Central Serilog composition.
 ///
-/// Per AD-5 this output is diagnostics only. It is deliberately NOT the audit trail: audit lives in
-/// the AuditEntry table and is written inside the same transaction as the change it records, so it
-/// cannot disagree with committed state. Anything that queries "what happened" reads that table,
+/// This output is diagnostics only. It is deliberately NOT the audit trail: audit lives in the
+/// AuditEntry table and is written inside the same transaction as the change it records, so it
+/// can't disagree with committed state. Anything that queries "what happened" reads that table,
 /// never these logs.
 /// </summary>
 public static class TelemetryConfiguration
@@ -60,7 +60,7 @@ public static class TelemetryConfiguration
 
     /// <summary>
     /// Attaches the correlation properties that make a request log line actionable: the trace id
-    /// that ties it to a distributed trace, and the acting user per AD-10.
+    /// that ties it to a distributed trace, and the acting user.
     /// </summary>
     public static void EnrichRequestLog(IDiagnosticContext context, HttpContext httpContext)
     {

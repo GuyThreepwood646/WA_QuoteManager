@@ -6,8 +6,8 @@ using QuoteManager.Infrastructure.Messaging;
 namespace QuoteManager.Infrastructure.Tests.Messaging;
 
 /// <summary>
-/// AD-6's contract test suite against the local adapter, which runs unconditionally in CI (unlike
-/// the Service Bus adapter's own contract test, which is gated behind a live connection string).
+/// A contract test suite against the local adapter, which runs unconditionally in CI (unlike the
+/// Service Bus adapter's own contract test, which is gated behind a live connection string).
 /// </summary>
 public sealed class InProcessIntegrationEventPublisherTests
 {

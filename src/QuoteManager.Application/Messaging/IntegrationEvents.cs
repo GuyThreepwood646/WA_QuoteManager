@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 namespace QuoteManager.Application.Messaging;
 
 /// <summary>
-/// A versioned contract that may leave the process as an integration event, per AD-4.
+/// A versioned contract that may leave the process as an integration event.
 /// </summary>
 /// <remarks>
 /// Deliberately its own type per event, never a Domain type reused across the boundary - a

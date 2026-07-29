@@ -6,7 +6,7 @@ using QuoteManager.Infrastructure.Persistence;
 namespace QuoteManager.Api.IntegrationTests.Persistence;
 
 /// <summary>
-/// Proves the database half of AD-3 actually refuses a second accepted quote.
+/// Proves the database's filtered unique index actually refuses a second accepted quote.
 /// </summary>
 /// <remarks>
 /// Every insert here is raw SQL, deliberately. Going through the aggregate would prove only that

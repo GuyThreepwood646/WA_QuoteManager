@@ -6,10 +6,10 @@ using QuoteManager.Infrastructure.Messaging;
 namespace QuoteManager.Infrastructure.Tests.Messaging;
 
 /// <summary>
-/// AD-6's compile-verified Service Bus contract test. Excluded from the default run via the
-/// <c>Requires=Azure</c> trait, since the subscription this project targets is inactive by stated
-/// constraint (see the spine's Delivery Order); run explicitly with
-/// <c>dotnet test --filter "Requires=Azure"</c> once a live namespace and connection string exist.
+/// A compile-verified Service Bus contract test. Excluded from the default run via the
+/// <c>Requires=Azure</c> trait, since there's no live Azure subscription for this project to
+/// target; run explicitly with <c>dotnet test --filter "Requires=Azure"</c> once a live namespace
+/// and connection string exist.
 /// </summary>
 [Trait("Requires", "Azure")]
 public sealed class ServiceBusIntegrationEventPublisherTests

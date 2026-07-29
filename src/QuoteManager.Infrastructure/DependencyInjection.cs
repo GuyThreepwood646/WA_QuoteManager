@@ -35,10 +35,10 @@ public static class DependencyInjection
         // what makes expiry and staleness signals reproducible under test.
         services.AddSingleton(TimeProvider.System);
 
-        // AD-4/AD-5: appends an AuditEntry per domain event, and an OutboxMessage for those on the
-        // integration allow-list, inside the same SaveChanges call as the change that raised them.
-        // Registered as a singleton per EF Core's own guidance for stateless interceptors, and
-        // attached to every QuoteManagerDbContext instance.
+        // Appends an AuditEntry per domain event, and an OutboxMessage for those on the integration
+        // allow-list, inside the same SaveChanges call as the change that raised them. Registered
+        // as a singleton per EF Core's own guidance for stateless interceptors, and attached to
+        // every QuoteManagerDbContext instance.
         services.AddSingleton<DomainEventPersistenceInterceptor>();
         services.AddDbContext<QuoteManagerDbContext>((serviceProvider, options) =>
             options.UseSqlite(connectionString)
@@ -48,7 +48,7 @@ public static class DependencyInjection
         services.AddScoped<DemoDataSeeder>();
         services.AddScoped<DatabaseInitializer>();
 
-        // AD-10: ICurrentUser is a per-request adapter over the authenticated principal.
+        // ICurrentUser is a per-request adapter over the authenticated principal.
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUser>();
 
@@ -58,7 +58,7 @@ public static class DependencyInjection
     }
 
     /// <summary>
-    /// AD-6: the one composition-root method that decides which <see cref="IIntegrationEventPublisher"/>
+    /// The one composition-root method that decides which <see cref="IIntegrationEventPublisher"/>
     /// adapter is active. An absent <see cref="ServiceBusOptions.ConnectionString"/> resolves the
     /// in-process channel adapter; a present one resolves the Azure Service Bus adapter. Nothing
     /// outside this method ever branches on that setting.

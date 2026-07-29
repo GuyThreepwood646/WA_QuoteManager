@@ -6,8 +6,8 @@ using QuoteManager.Application.Messaging;
 namespace QuoteManager.Infrastructure.Messaging;
 
 /// <summary>
-/// AD-6's default adapter for <see cref="IIntegrationEventPublisher"/>: an in-process channel, so
-/// the demo has a genuine local queue to show rather than a publish call that quietly does nothing.
+/// The default adapter for <see cref="IIntegrationEventPublisher"/>: an in-process channel, so the
+/// demo has a genuine local queue to show rather than a publish call that quietly does nothing.
 /// </summary>
 /// <remarks>
 /// Selected whenever <see cref="ServiceBusOptions.ConnectionString"/> is absent. Handing an

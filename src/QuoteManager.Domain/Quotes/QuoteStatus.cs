@@ -4,8 +4,9 @@ namespace QuoteManager.Domain.Quotes;
 /// The quote lifecycle states.
 /// </summary>
 /// <remarks>
-/// Persisted as strings, not ordinals, so the filtered unique index in AD-3 can be expressed
-/// against a readable value and inserting a state later cannot silently renumber stored rows.
+/// Persisted as strings, not ordinals, so the filtered unique index enforcing "at most one
+/// accepted quote per request" can be expressed against a readable value, and inserting a new
+/// state later can't silently renumber stored rows.
 /// </remarks>
 public enum QuoteStatus
 {
@@ -22,9 +23,8 @@ public enum QuoteStatus
 /// Actions a caller may attempt against a quote.
 /// </summary>
 /// <remarks>
-/// <see cref="Edit"/> is not a lifecycle transition but travels in the same permitted-action set,
-/// per AD-7: if the UI had to derive editability from status on its own, that is precisely the
-/// client-side rule duplication AD-7 forbids.
+/// <see cref="Edit"/> is not a lifecycle transition but travels in the same permitted-action set
+/// so the UI never has to derive editability from status on its own.
 /// </remarks>
 public enum QuoteAction
 {

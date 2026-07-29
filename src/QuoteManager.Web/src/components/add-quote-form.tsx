@@ -11,8 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 /**
- * FR-1's vendor side, shown only when the server says <c>canAddQuote</c> (AD-7's request-level
- * counterpart to a quote's <c>permittedActions</c>) - the vendor organisation is the caller's own,
+ * Shown only when the server says <c>canAddQuote</c> - the request-level counterpart to a quote's
+ * <c>permittedActions</c>. The vendor organisation is the caller's own,
  * never a field on this form, so there is nothing here for a Vendor to get wrong about whose
  * organisation the draft belongs to.
  */

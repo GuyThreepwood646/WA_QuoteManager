@@ -3,7 +3,7 @@ using System.Xml.Linq;
 namespace QuoteManager.Architecture.Tests;
 
 /// <summary>
-/// Mechanical enforcement of AD-1 (inward-only dependency direction).
+/// Mechanical enforcement of the inward-only dependency direction between projects.
 ///
 /// These assertions read the project files rather than the compiled assemblies, and that choice is
 /// deliberate. Roslyn omits assembly references that no code actually uses, so an assembly-level

@@ -6,7 +6,7 @@ using QuoteManager.Infrastructure.Persistence;
 namespace QuoteManager.Api.IntegrationTests.Persistence;
 
 /// <summary>
-/// Proves AD-4: only domain events on the integration allow-list produce an
+/// Proves that only domain events on the integration allow-list produce an
 /// <see cref="QuoteManager.Infrastructure.Persistence.Entities.OutboxMessage"/>, every such row is
 /// eventually dispatched by <see cref="QuoteManager.Infrastructure.Messaging.OutboxDispatcher"/>
 /// through the local adapter selected by default, and events off the allow-list (such as

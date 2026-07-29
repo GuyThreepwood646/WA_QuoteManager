@@ -1,7 +1,7 @@
 namespace QuoteManager.Api.Auth;
 
 /// <summary>
-/// Binds the <c>Jwt</c> configuration section that backs AD-9's bearer scheme.
+/// Binds the <c>Jwt</c> configuration section that backs the bearer scheme.
 /// </summary>
 public sealed class JwtOptions
 {
@@ -19,7 +19,7 @@ public sealed class JwtOptions
     public required string Audience { get; init; }
 
     /// <summary>
-    /// AD-14: long enough that expiry cannot interrupt a demo or a reviewer's evaluation session.
+    /// Long enough that expiry can't interrupt a demo or a reviewer's evaluation session.
     /// </summary>
     public TimeSpan Lifetime { get; init; } = TimeSpan.FromHours(8);
 }

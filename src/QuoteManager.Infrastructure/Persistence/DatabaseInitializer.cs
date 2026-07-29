@@ -8,7 +8,7 @@ namespace QuoteManager.Infrastructure.Persistence;
 /// Brings the database up to date at start-up, and seeds it when the environment permits.
 /// </summary>
 /// <remarks>
-/// AD-16: migrations are the only schema authority. <c>EnsureCreated</c> is deliberately not used
+/// Migrations are the only schema authority. <c>EnsureCreated</c> is deliberately not used
 /// anywhere — it builds a schema from the model while skipping migration history, which would
 /// silently omit the filtered unique index the accepted-quote invariant depends on.
 /// </remarks>

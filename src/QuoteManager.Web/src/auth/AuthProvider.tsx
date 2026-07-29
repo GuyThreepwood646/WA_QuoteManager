@@ -5,8 +5,8 @@ import { login as loginRequest } from '../api/auth'
 import { getSession, restoreSession, setSession, subscribeToSession } from './authSession'
 import type { AuthSession } from './authSession'
 
-// Rehydrates once at module load, before the first render, so a page refresh does not log a
-// reviewer out (AD-14's stated sessionStorage trade-off).
+// Rehydrates once at module load, before the first render, so a page refresh doesn't log a
+// reviewer out.
 restoreSession()
 
 interface AuthContextValue {

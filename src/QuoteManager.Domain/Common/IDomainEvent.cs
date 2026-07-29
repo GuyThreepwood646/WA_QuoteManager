@@ -4,10 +4,9 @@ namespace QuoteManager.Domain.Common;
 /// A fact about something that already happened inside an aggregate.
 /// </summary>
 /// <remarks>
-/// Per AD-4 and AD-5, every domain event is written to the audit trail, while only
-/// events on the integration allow-list are also written to the outbox. Implementations
-/// therefore carry the actor and timestamp needed for an audit row without any consumer
-/// having to reach back into infrastructure to reconstruct them.
+/// Every domain event gets written to the audit trail; only the ones on the integration
+/// allow-list also go to the outbox. So each event carries the actor and timestamp an audit row
+/// needs, without infrastructure code having to reconstruct them from somewhere else.
 /// </remarks>
 public interface IDomainEvent
 {

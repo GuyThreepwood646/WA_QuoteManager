@@ -6,12 +6,12 @@
     "react/only-export-components": ["warn", { "allowConstantExport": true }],
     "no-restricted-globals": [
       "error",
-      { "name": "fetch", "message": "Call apiClient instead of fetch directly (AD-14)." }
+      { "name": "fetch", "message": "Call apiClient instead of fetch directly." }
     ],
     "no-restricted-imports": [
       "error",
       {
-        "paths": [{ "name": "axios", "message": "Call apiClient instead of axios (AD-14)." }]
+        "paths": [{ "name": "axios", "message": "Call apiClient instead of axios." }]
       }
     ]
   },

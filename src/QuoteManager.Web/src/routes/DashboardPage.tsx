@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatMoney, formatRelative } from '@/lib/format'
 
 /**
- * FR-4: a triage surface, not a CRUD grid. Each section answers one question a user actually has
+ * A triage surface, not a CRUD grid. Each section answers one question a user actually has
  * ("what needs my review", "what's about to lapse", "who's gone quiet") rather than being a
  * filtered slice of one big list - so an empty section is a real, useful answer ("nothing here"),
  * not a hidden feature.

@@ -7,7 +7,7 @@ namespace QuoteManager.Api.Models;
 /// The body of <c>POST /api/requests/{requestId}/quotes/{quoteId}/transitions</c>.
 /// </summary>
 /// <remarks>
-/// AD-7: the one action-driven transition contract. There is no attribute in
+/// The one action-driven transition contract. There is no attribute in
 /// <see cref="System.ComponentModel.DataAnnotations"/> that constrains an enum to its defined
 /// members, and <see cref="System.Text.Json.Serialization.JsonStringEnumConverter"/> still accepts
 /// a bare integer on deserialisation — so <c>{"action": 99}</c> would otherwise bind successfully

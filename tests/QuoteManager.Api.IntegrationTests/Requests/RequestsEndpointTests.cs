@@ -80,11 +80,11 @@ public sealed class RequestsEndpointTests : IDisposable
         detail.Quotes.Count.ShouldBe(2);
         detail.Invitations.Count.ShouldBe(3);
 
-        // Two invitees quoted, the third (Interstate) never did - the exact signal AD-11 exists for.
+        // Two invitees quoted, the third (Interstate) never did - the signal this list exists for.
         detail.Invitations.Count(i => i.HasQuoted).ShouldBe(2);
         detail.Invitations.ShouldContain(i => i.VendorOrganizationName == "Interstate Freight Partners" && !i.HasQuoted);
 
-        // Both quotes are past Draft, so per AD-2's mutability rule the request itself is frozen.
+        // Both quotes are past Draft, so the request's own mutability rule freezes the request itself.
         detail.IsEditable.ShouldBeFalse();
 
         var crateworksQuote = detail.Quotes.Single(q => q.VendorOrganizationName == "Crateworks Packing & Crating");
@@ -98,8 +98,8 @@ public sealed class RequestsEndpointTests : IDisposable
         var ct = TestContext.Current.CancellationToken;
 
         // Crateworks (vendor2@) quoted on the sample-storage request alongside SecureBase, with
-        // Interstate invited but silent. Without AD-13's read-side filter, Crateworks could read
-        // SecureBase's amount, notes, and status straight off this response.
+        // Interstate invited but silent. Without the read-side vendor filter, Crateworks could
+        // read SecureBase's amount, notes, and status straight off this response.
         var requestId = await FindRequestIdAsync("Regional sample storage — Southeast territory", ct);
         var client = await LoginAsAsync("vendor2@warehouseanywhere.test");
 
@@ -186,7 +186,7 @@ public sealed class RequestsEndpointTests : IDisposable
         return client;
     }
 
-    /// <summary>The shape of the 400 the built-in minimal API validation (AD-8) returns.</summary>
+    /// <summary>The shape of the 400 the built-in minimal API validation returns.</summary>
     private sealed record ValidationProblemBody(Dictionary<string, string[]> Errors);
 }
 

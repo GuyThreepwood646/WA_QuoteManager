@@ -8,9 +8,9 @@ using QuoteManager.Infrastructure.Persistence;
 namespace QuoteManager.Api.IntegrationTests.Dashboard;
 
 /// <summary>
-/// Proves the triage buckets (AD-11, FR-4) match what the seed actually contains, rather than just
-/// asserting the endpoint returns 200 - a dashboard that answers the wrong question is worse than
-/// one that fails to load, since nothing tells the user their triage is wrong.
+/// Proves the triage buckets match what the seed actually contains, rather than just asserting
+/// the endpoint returns 200 - a dashboard that answers the wrong question is worse than one that
+/// fails to load, since nothing tells the user their triage is wrong.
 /// </summary>
 public sealed class DashboardTests : IDisposable
 {

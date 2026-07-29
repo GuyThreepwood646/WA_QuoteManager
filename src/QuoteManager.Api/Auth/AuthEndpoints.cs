@@ -18,12 +18,12 @@ public static class AuthEndpoints
     {
         var group = endpoints.MapGroup("/api/auth");
 
-        // AD-14: the one login contract the SPA's apiClient depends on. Anonymous per AD-9.
+        // The one login contract the SPA's apiClient depends on. Anonymous by design.
         group.MapPost("/login", LoginAsync).AllowAnonymous();
 
         // Lets the SPA's AuthProvider rehydrate identity after a page refresh without re-parsing
-        // the token client-side, and gives AD-9's anonymous-set test a protected route to assert
-        // 401 against.
+        // the token client-side, and gives the anonymous-set test a protected route to assert 401
+        // against.
         group.MapGet("/me", (ICurrentUser currentUser) => Results.Ok(ToResponse(currentUser)));
     }
 

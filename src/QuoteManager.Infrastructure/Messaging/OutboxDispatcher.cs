@@ -9,17 +9,17 @@ using QuoteManager.Infrastructure.Persistence;
 namespace QuoteManager.Infrastructure.Messaging;
 
 /// <summary>
-/// AD-4: the only component that reads <see cref="Persistence.Entities.OutboxMessage"/> rows and
-/// hands them to <see cref="IIntegrationEventPublisher"/>.
+/// The only component that reads <see cref="Persistence.Entities.OutboxMessage"/> rows and hands
+/// them to <see cref="IIntegrationEventPublisher"/>.
 /// </summary>
 /// <remarks>
 /// Claims undispatched rows in insertion order - <c>OrderBy(m =&gt; m.Id)</c> is sufficient because
-/// every id is a UUIDv7, which the identifiers convention already pins as sorting monotonically by
-/// creation time. A message is marked dispatched only after <see cref="IIntegrationEventPublisher.PublishAsync"/>
-/// returns without throwing, so delivery is at-least-once: a publish that succeeds but whose
-/// <c>DispatchedAt</c> write is then lost to a crash is redelivered on the next poll. Every
-/// consumer must therefore be idempotent, keyed on <see cref="IntegrationEventEnvelope.Id"/>.
-/// Single-instance ordered draining only; see the spine's Deferred table for horizontal scale-out.
+/// every id is a UUIDv7, which sorts monotonically by creation time. A message is marked
+/// dispatched only after <see cref="IIntegrationEventPublisher.PublishAsync"/> returns without
+/// throwing, so delivery is at-least-once: a publish that succeeds but whose <c>DispatchedAt</c>
+/// write is then lost to a crash is redelivered on the next poll. Every consumer must therefore be
+/// idempotent, keyed on <see cref="IntegrationEventEnvelope.Id"/>. This drains a single instance in
+/// order; scaling out to multiple dispatchers would need a claim mechanism this doesn't have.
 /// </remarks>
 public sealed class OutboxDispatcher(
     IServiceScopeFactory scopeFactory,

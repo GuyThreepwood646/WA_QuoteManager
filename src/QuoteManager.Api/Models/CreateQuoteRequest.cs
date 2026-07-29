@@ -6,10 +6,10 @@ namespace QuoteManager.Api.Models;
 /// The body of <c>POST /api/requests/{requestId}/quotes</c>.
 /// </summary>
 /// <remarks>
-/// AD-13: <see cref="VendorOrganizationId"/> travels in the body rather than being inferred from
-/// the caller, because an Admin may draft on behalf of any vendor - <c>Request.AddQuote</c> is
-/// still the sole authority on whether the caller may act for the organisation named here, so
-/// this type validates only shape, never ownership.
+/// <see cref="VendorOrganizationId"/> travels in the body rather than being inferred from the
+/// caller, because an Admin may draft on behalf of any vendor - <c>Request.AddQuote</c> is still
+/// the sole authority on whether the caller may act for the organisation named here, so this type
+/// validates only shape, never ownership.
 /// </remarks>
 public sealed record CreateQuoteRequest : IValidatableObject
 {

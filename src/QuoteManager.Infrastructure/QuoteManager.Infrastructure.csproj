@@ -4,7 +4,7 @@
     <ProjectReference Include="..\QuoteManager.Application\QuoteManager.Application.csproj" />
   </ItemGroup>
 
-  <!-- AD-10: ICurrentUser is implemented over HttpContext.User, which needs the ASP.NET Core
+  <!-- ICurrentUser is implemented over HttpContext.User, which needs the ASP.NET Core
        abstractions. Infrastructure uses Microsoft.NET.Sdk rather than Sdk.Web, so the shared
        framework is pulled in via FrameworkReference rather than a NuGet package - the standalone
        Microsoft.AspNetCore.Http.Abstractions package is frozen at 2.2.0 and superseded by the
@@ -25,7 +25,7 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- AD-6: the Azure adapter compiles into every build and is selected only when its
+  <!-- The Azure adapter compiles into every build and is selected only when its
        connection string is present. It is never a conditional compilation symbol. -->
   <ItemGroup>
     <PackageReference Include="Azure.Messaging.ServiceBus" />

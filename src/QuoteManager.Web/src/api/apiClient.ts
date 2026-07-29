@@ -2,8 +2,8 @@ import { getSession, setSession } from '../auth/authSession'
 import { queryClient } from './queryClient'
 
 /**
- * A refused request, carrying the RFC 9457 `code` extension the UI is allowed to branch on
- * (AD-8) - never the human-readable `detail`, which can be reworded without notice.
+ * A refused request, carrying the RFC 9457 `code` extension the UI is allowed to branch on -
+ * never the human-readable `detail`, which can be reworded without notice.
  */
 export class ApiError extends Error {
   readonly status: number
@@ -79,7 +79,7 @@ async function tryParseProblemDetails(response: Response): Promise<ProblemDetail
 }
 
 /**
- * The one place in the SPA a network request originates (AD-14). Every resource module - `auth`,
+ * The one place in the SPA a network request originates. Every resource module - `auth`,
  * `quotes`, and whatever follows - calls through here rather than touching `fetch` directly; the
  * oxlint `no-restricted-globals` rule makes that a build failure, not just a convention.
  */

@@ -3,7 +3,7 @@ using QuoteManager.Domain.Identity;
 namespace QuoteManager.Application.Abstractions;
 
 /// <summary>
-/// The acting user for the current unit of work, per AD-10.
+/// The acting user for the current unit of work.
 /// </summary>
 /// <remarks>
 /// Implemented over the authenticated principal only. No request payload may supply an actor, so

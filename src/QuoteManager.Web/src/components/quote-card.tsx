@@ -14,8 +14,8 @@ interface ActionStyle {
   variant: 'default' | 'destructive' | 'outline' | 'secondary'
 }
 
-// "Edit" travels in permittedActions per AD-7 but is a field-mutability signal (AD-2), not a
-// status transition - it has no endpoint of its own yet, so it is not rendered as a button here.
+// "Edit" travels in permittedActions but is a field-mutability signal, not a status transition -
+// it has no endpoint of its own yet, so it isn't rendered as a button here.
 const actionStyles: Record<string, ActionStyle> = {
   Submit: { label: 'Submit', variant: 'default' },
   StartReview: { label: 'Start review', variant: 'default' },

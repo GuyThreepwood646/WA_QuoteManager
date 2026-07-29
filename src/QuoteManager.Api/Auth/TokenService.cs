@@ -11,7 +11,7 @@ namespace QuoteManager.Api.Auth;
 public sealed record IssuedToken(string AccessToken, DateTimeOffset ExpiresAt);
 
 /// <summary>
-/// Issues the AD-9 bearer token for an authenticated <see cref="AppUser"/>.
+/// Issues the bearer token for an authenticated <see cref="AppUser"/>.
 /// </summary>
 public sealed class TokenService(IOptions<JwtOptions> options, TimeProvider timeProvider)
 {

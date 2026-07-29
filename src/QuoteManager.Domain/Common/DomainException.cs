@@ -4,9 +4,8 @@ namespace QuoteManager.Domain.Common;
 /// A refused business operation, carrying a stable machine code.
 /// </summary>
 /// <remarks>
-/// AD-8: the <see cref="Code"/> is what crosses the wire as the <c>code</c> extension on the
-/// problem details response and is the only thing the UI is allowed to branch on. Codes are
-/// therefore part of the public contract and must not be reworded casually, unlike messages.
+/// <see cref="Code"/> is what crosses the wire as the problem details <c>code</c> extension, and
+/// it's the only thing the UI should ever branch on — it's a public contract, unlike the message.
 /// </remarks>
 public abstract class DomainException(string message) : Exception(message)
 {

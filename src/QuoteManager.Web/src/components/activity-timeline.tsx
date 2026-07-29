@@ -5,9 +5,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate, formatRelative } from '@/lib/format'
 
 /**
- * FR-4/FR-5's UI half: the audit trail (AD-5) rendered as a request-scoped timeline rather than a
- * raw log. The endpoint already applies AD-13's vendor read filter, so this component never has
- * to reason about roles - it renders exactly what it is given.
+ * The audit trail rendered as a request-scoped timeline rather than a raw log. The endpoint
+ * already applies the vendor read filter, so this component never has to reason about roles - it
+ * renders exactly what it's given.
  */
 export function ActivityTimeline({ requestId }: { requestId: string }) {
   const { data, isPending, isError } = useQuery({

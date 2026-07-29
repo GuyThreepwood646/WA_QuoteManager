@@ -7,7 +7,7 @@ using QuoteManager.Infrastructure.Messaging;
 namespace QuoteManager.Infrastructure.Tests.Messaging;
 
 /// <summary>
-/// AD-6's one directly testable claim about adapter selection: an absent Service Bus connection
+/// The one directly testable claim about adapter selection: an absent Service Bus connection
 /// string resolves the local adapter, a present one resolves the Azure adapter, and nothing else
 /// in the codebase ever branches on that setting itself.
 /// </summary>

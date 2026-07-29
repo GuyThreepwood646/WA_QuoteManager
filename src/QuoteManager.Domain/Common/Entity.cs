@@ -4,9 +4,9 @@ namespace QuoteManager.Domain.Common;
 /// An entity that lives inside an aggregate and so cannot raise events or be saved on its own.
 /// </summary>
 /// <remarks>
-/// It still carries its own <see cref="Version"/> because AD-15 concurrency-checks the entity a
-/// caller actually addressed. Two reviewers acting on different quotes of one request must not
-/// collide, so the token has to be finer-grained than the aggregate.
+/// Carries its own <see cref="Version"/> because we concurrency-check the specific entity a
+/// caller addressed, not just the aggregate — two reviewers acting on different quotes of the
+/// same request shouldn't collide with each other.
 /// </remarks>
 public abstract class Entity
 {

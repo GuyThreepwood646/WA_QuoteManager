@@ -11,9 +11,9 @@ using QuoteManager.Infrastructure.Persistence;
 namespace QuoteManager.Api.IntegrationTests.Quotes;
 
 /// <summary>
-/// Exercises the single action-driven transition endpoint (AD-2) against the seeded demo data,
-/// proving the role axis and permittedActions projection (AD-7) live entirely in
-/// <c>QuoteTransitions</c> rather than in the endpoint.
+/// Exercises the single action-driven transition endpoint against the seeded demo data, proving
+/// the role axis and permittedActions projection live entirely in <c>QuoteTransitions</c> rather
+/// than in the endpoint.
 /// </summary>
 public sealed class QuoteTransitionTests : IDisposable
 {
@@ -115,7 +115,7 @@ public sealed class QuoteTransitionTests : IDisposable
     public async Task A_vendor_may_not_withdraw_another_vendors_quote()
     {
         // Seed: the sample-storage request has SecureBase UnderReview and Crateworks Submitted.
-        // Without the AD-13 ownership check, SecureBase (vendor@) could Withdraw Crateworks's
+        // Without the vendor ownership check, SecureBase (vendor@) could Withdraw Crateworks's
         // quote because both share the Vendor role.
         var (requestId, quoteId) = await FindQuoteAsync("Regional sample storage — Southeast territory", "vendor2@warehouseanywhere.test");
         var competitor = await LoginAsAsync("vendor@warehouseanywhere.test");
@@ -218,6 +218,6 @@ public sealed class QuoteTransitionTests : IDisposable
 
     private sealed record ProblemCode(string Code);
 
-    /// <summary>The shape of the 400 the built-in minimal API validation (AD-8) returns.</summary>
+    /// <summary>The shape of the 400 the built-in minimal API validation returns.</summary>
     private sealed record ValidationProblemBody(Dictionary<string, string[]> Errors);
 }

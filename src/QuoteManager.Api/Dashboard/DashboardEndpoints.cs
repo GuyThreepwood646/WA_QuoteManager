@@ -34,9 +34,9 @@ public sealed record DashboardResponse(
     IReadOnlyList<RequestAwaitingResponseItem> RequestsAwaitingResponse);
 
 /// <summary>
-/// FR-4: "see what's happening, focus on the right work" - a triage/prioritisation surface, not a
-/// CRUD grid. Every bucket here answers a specific question a user actually has, rather than being
-/// a filtered view of one big list.
+/// "See what's happening, focus on the right work" - a triage/prioritisation surface, not a CRUD
+/// grid. Every bucket here answers a specific question a user actually has, rather than being a
+/// filtered view of one big list.
 /// </summary>
 public static class DashboardEndpoints
 {
@@ -57,10 +57,10 @@ public static class DashboardEndpoints
         var now = timeProvider.GetUtcNow();
         var actor = currentUser.ToActor();
 
-        // AD-11: one AsNoTracking projection joining Quotes/Requests/Organizations by id (there is
-        // no navigation property between them - see AD-3's note on why Quote carries no
-        // VendorOrganization reference). permittedActions is computed after materialising, since
-        // QuoteTransitions.PermittedFor is plain C# and cannot translate to SQL.
+        // One AsNoTracking projection joining Quotes/Requests/Organizations by id (there's no
+        // navigation property between them - Quote deliberately carries no VendorOrganization
+        // reference). permittedActions is computed after materialising, since
+        // QuoteTransitions.PermittedFor is plain C# and can't translate to SQL.
         var quoteRows = await (
             from quote in db.Quotes.AsNoTracking()
             join request in db.Requests.AsNoTracking() on quote.RequestId equals request.Id

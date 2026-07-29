@@ -4,7 +4,7 @@ using QuoteManager.Domain.Quotes;
 namespace QuoteManager.Domain.Tests;
 
 /// <summary>
-/// Tests the transition table directly, since AD-2 makes it the sole authority on the lifecycle.
+/// Tests the transition table directly, since it's the sole authority on the quote lifecycle.
 /// </summary>
 public sealed class QuoteTransitionTableTests
 {
@@ -103,7 +103,7 @@ public sealed class QuoteTransitionTableTests
     [Fact]
     public void A_vendor_cannot_act_on_another_vendors_quote()
     {
-        // The exact AD-13 gap: role matches, organisation does not. Without the ownership check
+        // Role matches, organisation does not. Without the ownership check
         // this would succeed, and any Vendor could Withdraw a competitor's Submitted quote.
         var resolution = QuoteTransitions.Resolve(QuoteStatus.Submitted, QuoteAction.Withdraw, Vendor, OtherOrg);
 

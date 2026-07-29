@@ -5,11 +5,11 @@ using QuoteManager.Domain.Requests;
 namespace QuoteManager.Application.Messaging;
 
 /// <summary>
-/// AD-4's allow-list: the single place that decides which domain events also leave the process as
-/// integration events, and the versioned, Domain-type-free shape each takes on the wire.
+/// The single place that decides which domain events also leave the process as integration
+/// events, and the versioned, Domain-type-free shape each takes on the wire.
 /// </summary>
 /// <remarks>
-/// A domain event absent from <see cref="Resolve"/> is still written to the audit trail (AD-5) and
+/// A domain event absent from <see cref="Resolve"/> is still written to the audit trail and
 /// nowhere else - the outbox carries out-of-boundary effects that another system needs to react to,
 /// not an undifferentiated firehose of every internal state change. <see cref="QuoteStatusChanged"/>
 /// carries every quote transition, not just acceptance, so it is pattern-matched on

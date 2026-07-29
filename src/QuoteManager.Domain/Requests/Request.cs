@@ -25,8 +25,8 @@ public enum RequestStatus
 /// </summary>
 /// <remarks>
 /// The root is the request rather than the quote because the invariant that matters — at most one
-/// accepted quote — spans siblings (AD-3). Enforcing it requires a boundary that can see all of
-/// them, so every quote mutation enters through this class.
+/// accepted quote — spans siblings. Enforcing it requires a boundary that can see all of them, so
+/// every quote mutation enters through this class.
 /// </remarks>
 public sealed class Request : AggregateRoot
 {
@@ -97,9 +97,9 @@ public sealed class Request : AggregateRoot
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
 
-        // Mirrors AD-13's vendor-ownership gate on AddQuote: this is the client side of the same
-        // problem. A Vendor or Reviewer account raising a request is not a harmless no-op, it is
-        // one organisation's staff fabricating a request on behalf of a client they do not
+        // Mirrors the vendor-ownership gate on AddQuote: this is the client side of the same
+        // problem. A Vendor or Reviewer account raising a request is not a harmless no-op, it's
+        // one organisation's staff fabricating a request on behalf of a client they don't
         // represent - checked here, once, rather than trusted to every future caller.
         if (!actor.Roles.HasAny(AppRole.Requester | AppRole.Admin))
         {
@@ -117,7 +117,7 @@ public sealed class Request : AggregateRoot
     }
 
     /// <summary>
-    /// Whether the request's own fields may still be changed, per AD-2's mutability rule.
+    /// Whether the request's own fields may still be changed.
     /// </summary>
     /// <remarks>
     /// The gate is the arrival of the first quote past <see cref="QuoteStatus.Draft"/>, not the
@@ -184,9 +184,9 @@ public sealed class Request : AggregateRoot
                 $"Quotes cannot be added to a request in state '{Status}'.");
         }
 
-        // AD-13: creating a quote is the other vendor-owned gate. Checking here, not only on
-        // transitions, means a Vendor cannot plant a draft under a competitor's organisation and
-        // then leave it for that competitor to discover.
+        // Creating a quote is the other vendor-owned gate. Checking here, not only on transitions,
+        // means a Vendor can't plant a draft under a competitor's organisation and then leave it
+        // for that competitor to discover.
         if (!actor.CanActForVendorOrganization(vendorOrganizationId))
         {
             throw new QuoteTransitionNotAllowedException(

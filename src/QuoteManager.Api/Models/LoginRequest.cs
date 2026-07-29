@@ -6,13 +6,13 @@ namespace QuoteManager.Api.Models;
 /// The body of <c>POST /api/auth/login</c>.
 /// </summary>
 /// <remarks>
-/// AD-14: the one login contract the SPA's apiClient depends on.
+/// The one login contract the SPA's apiClient depends on.
 ///
 /// Property attributes reject what a shape check alone can catch — a missing field, a value that
-/// is not an email at all. <see cref="Validate"/> exists for the one thing attributes cannot
-/// express here: <see cref="EmailAddressAttribute"/> matches on the presence of a single interior
-/// <c>@</c> and does not anchor to the string's edges, so <c>" admin@warehouseanywhere.test "</c>
-/// passes it — and would silently fail the exact-match lookup in
+/// isn't an email at all. <see cref="Validate"/> exists for the one thing attributes can't express
+/// here: <see cref="EmailAddressAttribute"/> matches on the presence of a single interior <c>@</c>
+/// and doesn't anchor to the string's edges, so <c>" admin@warehouseanywhere.test "</c> passes it
+/// — and would silently fail the exact-match lookup in
 /// <see cref="QuoteManager.Api.Auth.AuthEndpoints"/> with a generic "invalid credentials" instead
 /// of a clear, specific 400.
 /// </remarks>

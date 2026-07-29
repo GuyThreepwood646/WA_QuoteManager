@@ -1,7 +1,7 @@
 namespace QuoteManager.Domain.Identity;
 
 /// <summary>
-/// The closed set of roles, per AD-13.
+/// The closed set of roles a user can hold.
 /// </summary>
 /// <remarks>
 /// Flags rather than a plain enum because a single transition is usually permitted to more than
@@ -43,8 +43,8 @@ public static class AppRoleExtensions
     /// The individual named roles set within a (possibly combined) flags value.
     /// </summary>
     /// <remarks>
-    /// Roles cross the wire as a JWT claim per role and a JSON string array (AD-14), neither of
-    /// which understands a combined flags value, so this is the one place that split happens.
+    /// Roles cross the wire as a JWT claim per role and a JSON string array, neither of which
+    /// understands a combined flags value, so this is the one place that split happens.
     /// </remarks>
     public static IEnumerable<AppRole> Split(this AppRole roles) => AllValues.Where(value => roles.HasAny(value));
 

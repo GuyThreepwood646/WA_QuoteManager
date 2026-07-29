@@ -7,9 +7,9 @@ namespace QuoteManager.Domain.Quotes;
 /// </summary>
 /// <remarks>
 /// <paramref name="IsVendorGated"/> marks rows whose <see cref="PermittedRoles"/> is the Vendor
-/// side of the table: AD-13 says a Vendor may act only on its own organisation's quotes, and a
-/// role check alone cannot express "this vendor, not any vendor" - so these rows carry an extra
-/// organisation-matching requirement that Reviewer/Admin-only rows do not.
+/// side of the table. A Vendor may only act on its own organisation's quotes, and a role check
+/// alone can't express "this vendor, not any vendor" — so these rows carry an extra
+/// organisation-matching requirement that Reviewer/Admin-only rows don't need.
 /// </remarks>
 public sealed record QuoteTransition(
     QuoteStatus From,
@@ -19,13 +19,13 @@ public sealed record QuoteTransition(
     bool IsVendorGated);
 
 /// <summary>
-/// The single authority on the quote lifecycle, per AD-2.
+/// The single authority on the quote lifecycle.
 /// </summary>
 /// <remarks>
 /// Both the API's authorisation check and the permitted-action set projected to the client call
 /// <see cref="PermittedFor"/>. Nothing else may decide whether an action is legal: a second
 /// opinion expressed as an <c>[Authorize(Roles = "...")]</c> attribute on a transition endpoint
-/// would let the UI offer actions the API refuses, which is the exact drift AD-7 exists to stop.
+/// would let the UI offer actions the API refuses, and the two would quietly drift apart over time.
 /// </remarks>
 public static class QuoteTransitions
 {
@@ -102,7 +102,7 @@ public static class QuoteTransitions
     }
 
     /// <summary>
-    /// Whether a quote's business fields may still be changed, per AD-2's mutability rule.
+    /// Whether a quote's business fields may still be changed.
     /// </summary>
     public static bool IsEditable(QuoteStatus status) => status is QuoteStatus.Draft;
 

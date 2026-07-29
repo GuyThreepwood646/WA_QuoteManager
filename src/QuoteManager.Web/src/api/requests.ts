@@ -17,25 +17,25 @@ export function getRequest(requestId: string): Promise<RequestDetailResponse> {
   return apiClient.get<RequestDetailResponse>(`/api/requests/${requestId}`)
 }
 
-/** FR-4/FR-5: the audit trail, projected as a per-request timeline rather than a raw log dump. */
+/** The audit trail, projected as a per-request timeline rather than a raw log dump. */
 export function getRequestActivity(requestId: string): Promise<PagedResult<ActivityEntryItem>> {
   return apiClient.get<PagedResult<ActivityEntryItem>>(`/api/requests/${requestId}/activity?pageSize=100`)
 }
 
-/** FR-1: raising a request. The API is the sole authority on whether the caller's role permits it. */
+/** Raises a request. The API is the sole authority on whether the caller's role permits it. */
 export function createRequest(input: CreateRequestInput): Promise<RequestDetailResponse> {
   return apiClient.post<RequestDetailResponse>('/api/requests', input)
 }
 
-/** FR-1's vendor side: drafting a quote against a request. */
+/** Drafts a quote against a request. */
 export function createQuote(requestId: string, input: CreateQuoteInput): Promise<RequestQuoteItem> {
   return apiClient.post<RequestQuoteItem>(`/api/requests/${requestId}/quotes`, input)
 }
 
 /**
- * The one action-driven transition call (AD-2): the quote's own `version` is round-tripped as a
- * weak If-Match (AD-15), so a change made since the page last loaded is refused as a conflict
- * rather than silently overwritten.
+ * The one action-driven transition call: the quote's own `version` is round-tripped as a weak
+ * If-Match, so a change made since the page last loaded is refused as a conflict rather than
+ * silently overwritten.
  */
 export function applyQuoteAction(
   requestId: string,

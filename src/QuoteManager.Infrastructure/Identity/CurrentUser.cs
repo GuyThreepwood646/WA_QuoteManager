@@ -6,7 +6,7 @@ using QuoteManager.Domain.Identity;
 namespace QuoteManager.Infrastructure.Identity;
 
 /// <summary>
-/// The AD-10 <see cref="ICurrentUser"/> port, implemented over the authenticated principal.
+/// The <see cref="ICurrentUser"/> port, implemented over the authenticated principal.
 /// </summary>
 public sealed class CurrentUser(IHttpContextAccessor httpContextAccessor) : ICurrentUser
 {

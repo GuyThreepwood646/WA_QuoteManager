@@ -12,8 +12,8 @@ using QuoteManager.Infrastructure.Persistence;
 namespace QuoteManager.Api.IntegrationTests.Quotes;
 
 /// <summary>
-/// Exercises <c>POST /api/requests/{requestId}/quotes</c> (FR-1's vendor side), which closes the
-/// gap where the only way a quote could ever come into existence was the demo seeder.
+/// Exercises <c>POST /api/requests/{requestId}/quotes</c>, which closes the gap where the only
+/// way a quote could ever come into existence was the demo seeder.
 /// </summary>
 public sealed class CreateQuoteEndpointTests : IDisposable
 {
@@ -221,6 +221,6 @@ public sealed class CreateQuoteEndpointTests : IDisposable
 
     private sealed record ProblemCode(string Code);
 
-    /// <summary>The shape of the 400 the built-in minimal API validation (AD-8) returns.</summary>
+    /// <summary>The shape of the 400 the built-in minimal API validation returns.</summary>
     private sealed record ValidationProblemBody(Dictionary<string, string[]> Errors);
 }

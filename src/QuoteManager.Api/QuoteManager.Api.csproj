@@ -4,7 +4,7 @@
     <UserSecretsId>quotemanager-api</UserSecretsId>
   </PropertyGroup>
 
-  <!-- AD-8: required for the source-generated minimal API validation interceptor (AddValidation)
+  <!-- Required for the source-generated minimal API validation interceptor (AddValidation)
        that drives IValidatableObject types in Api/Models. -->
   <PropertyGroup>
     <InterceptorsNamespaces>$(InterceptorsNamespaces);Microsoft.AspNetCore.Http.Validation.Generated</InterceptorsNamespaces>

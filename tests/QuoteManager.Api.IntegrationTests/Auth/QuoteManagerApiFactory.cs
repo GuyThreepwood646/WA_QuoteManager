@@ -7,7 +7,7 @@ namespace QuoteManager.Api.IntegrationTests.Auth;
 
 /// <summary>
 /// Hosts the real API against an isolated, throwaway SQLite database per test class, so auth tests
-/// exercise the actual middleware pipeline (AD-9) rather than a hand-rolled substitute.
+/// exercise the actual middleware pipeline rather than a hand-rolled substitute.
 /// </summary>
 public sealed class QuoteManagerApiFactory : WebApplicationFactory<Program>
 {
@@ -15,7 +15,7 @@ public sealed class QuoteManagerApiFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Explicit rather than relying on the ambient ASPNETCORE_ENVIRONMENT: AD-16's seeder is
+        // Explicit rather than relying on the ambient ASPNETCORE_ENVIRONMENT: the seeder is
         // skipped in Production, and these tests need the seeded demo accounts to log in against.
         builder.UseEnvironment(Environments.Development);
 

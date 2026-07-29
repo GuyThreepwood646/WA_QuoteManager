@@ -10,8 +10,8 @@ using QuoteManager.Infrastructure.Persistence;
 namespace QuoteManager.Api.IntegrationTests.Requests;
 
 /// <summary>
-/// FR-4/FR-5: proves the activity timeline actually surfaces <c>AuditEntry</c> per request, and
-/// applies AD-13's read-side filter exactly as <see cref="RequestsEndpointTests"/> proves for the
+/// Proves the activity timeline actually surfaces <c>AuditEntry</c> per request, and applies the
+/// same read-side vendor filter exactly as <see cref="RequestsEndpointTests"/> proves for the
 /// quotes/invitations lists themselves.
 /// </summary>
 public sealed class RequestActivityEndpointTests : IDisposable

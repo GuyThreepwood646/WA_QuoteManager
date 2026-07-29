@@ -1,7 +1,7 @@
 /**
  * Holds the current session outside React so `apiClient` can read and clear it without importing
- * a hook (AD-14: apiClient is plain code, not a component). `AuthProvider` is the only thing that
- * exposes this to the component tree, via `useSyncExternalStore`.
+ * a hook (apiClient is plain code, not a component). `AuthProvider` is the only thing that exposes
+ * this to the component tree, via `useSyncExternalStore`.
  */
 export interface CurrentUser {
   id: string

@@ -1,7 +1,7 @@
 namespace QuoteManager.Application.Messaging;
 
 /// <summary>
-/// An already-serialised integration event ready to leave the process, per AD-4.
+/// An already-serialised integration event ready to leave the process.
 /// </summary>
 /// <remarks>
 /// This is the only shape <see cref="QuoteManager.Application.Abstractions.IIntegrationEventPublisher"/>

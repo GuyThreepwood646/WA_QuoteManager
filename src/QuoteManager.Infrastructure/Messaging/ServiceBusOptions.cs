@@ -1,9 +1,9 @@
 namespace QuoteManager.Infrastructure.Messaging;
 
 /// <summary>
-/// AD-6: bound from configuration, never read ad hoc via <c>IConfiguration</c> outside the
-/// composition root. Absence of <see cref="ConnectionString"/> is what selects the local adapter -
-/// it is a supported configuration, not a missing setting.
+/// Bound from configuration, never read ad hoc via <c>IConfiguration</c> outside the composition
+/// root. Absence of <see cref="ConnectionString"/> is what selects the local adapter - it's a
+/// supported configuration, not a missing setting.
 /// </summary>
 public sealed class ServiceBusOptions
 {
@@ -11,6 +11,6 @@ public sealed class ServiceBusOptions
 
     public string? ConnectionString { get; set; }
 
-    /// <summary>Queue integration events are sent to. Not created automatically - provisioning is a Deferred concern.</summary>
+    /// <summary>Queue integration events are sent to. Not created automatically - provisioning the queue is out of scope here.</summary>
     public string QueueName { get; set; } = "quotemanager-integration-events";
 }

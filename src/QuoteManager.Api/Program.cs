@@ -28,8 +28,8 @@ try
     builder.Host.UseSerilog((context, services, configuration) =>
         TelemetryConfiguration.Configure(configuration, context.Configuration, context.HostingEnvironment));
 
-    // AD-6: telemetry is OpenTelemetry-native. Azure Monitor is one exporter, attached only when
-    // its connection string is present, so the absence of an Azure subscription is a supported
+    // Telemetry is OpenTelemetry-native. Azure Monitor is one exporter, attached only when its
+    // connection string is present, so the absence of an Azure subscription is a supported
     // configuration rather than a start-up failure.
     var azureMonitorConnectionString = builder.Configuration["AzureMonitor:ConnectionString"];
     if (!string.IsNullOrWhiteSpace(azureMonitorConnectionString))
@@ -45,7 +45,7 @@ try
     builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
     builder.Services.AddSingleton<TokenService>();
 
-    // AD-9: exactly one authentication scheme, JWT bearer, HS256. A fallback authorisation policy
+    // Exactly one authentication scheme, JWT bearer, HS256. A fallback authorisation policy
     // requires an authenticated user for every endpoint, so protection is the default and
     // anonymity is opt-in via explicit AllowAnonymous() calls below.
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -69,15 +69,15 @@ try
             .RequireAuthenticatedUser()
             .Build());
 
-    // AD-7: actions cross the wire as readable names (e.g. "StartReview"), not the ordinal a
-    // default JSON enum converter would emit, since the UI maps permittedActions to controls by
-    // comparing these strings against QuoteAction.
+    // Actions cross the wire as readable names (e.g. "StartReview"), not the ordinal a default
+    // JSON enum converter would emit, since the UI maps permittedActions to controls by comparing
+    // these strings against QuoteAction.
     builder.Services.ConfigureHttpJsonOptions(options =>
         options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
     builder.Services.AddOpenApi();
 
-    // AD-8: shape/format validation for every request body. Each type in Api/Models implements
+    // Shape/format validation for every request body. Each type in Api/Models implements
     // IValidatableObject; AddValidation wires the source-generated interceptor (see
     // InterceptorsNamespaces in QuoteManager.Api.csproj) that runs DataAnnotations attributes, then
     // Validate(), before a handler ever sees the model. A failure short-circuits straight to a 400
@@ -85,9 +85,9 @@ try
     // involvement.
     builder.Services.AddValidation();
 
-    // AD-8: every error leaves the process as RFC 9457 problem details. DomainExceptionHandler
-    // maps typed domain violations to their stable code and status first; AddProblemDetails is
-    // what lets it (and the fallback handler for anything unmapped) actually write the response.
+    // Every error leaves the process as RFC 9457 problem details. DomainExceptionHandler maps
+    // typed domain violations to their stable code and status first; AddProblemDetails is what
+    // lets it (and the fallback handler for anything unmapped) actually write the response.
     builder.Services.AddExceptionHandler<DomainExceptionHandler>();
     builder.Services.AddProblemDetails();
 
@@ -97,7 +97,7 @@ try
 
     // Migrations and the demo seed run before the first request is served, so a reviewer who
     // clones the repository and runs one command lands on a populated application rather than an
-    // empty one they have no credentials to fill (AD-16).
+    // empty one they have no credentials to fill.
     await using (var scope = app.Services.CreateAsyncScope())
     {
         var initializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
@@ -105,7 +105,7 @@ try
     }
 
     // Enriches each request log with the trace id and authenticated user, so a log line can always
-    // be tied back to a distributed trace and an actor (AD-8, AD-10).
+    // be tied back to a distributed trace and an actor.
     app.UseSerilogRequestLogging(options =>
         options.EnrichDiagnosticContext = TelemetryConfiguration.EnrichRequestLog);
 
@@ -125,7 +125,7 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
-    // AD-9's complete anonymous set: login, health, the OpenAPI document, the Scalar reference UI,
+    // The complete anonymous set: login, health, the OpenAPI document, the Scalar reference UI,
     // and the SPA fallback route. Everything else is protected by the fallback policy above.
     app.MapOpenApi().AllowAnonymous();
     if (app.Environment.IsDevelopment())

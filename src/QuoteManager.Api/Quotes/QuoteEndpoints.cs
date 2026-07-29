@@ -28,18 +28,18 @@ public static class QuoteEndpoints
 {
     public static void MapQuoteEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        // FR-1's vendor side: drafting a quote against a request. Same rule as the transition
-        // endpoint below - Request.AddQuote's CanActForVendorOrganization check (AD-13) is the
-        // sole authority on whether this caller may draft under the named vendor organisation.
+        // Drafting a quote against a request. Same rule as the transition endpoint below -
+        // Request.AddQuote's CanActForVendorOrganization check is the sole authority on whether
+        // this caller may draft under the named vendor organisation.
         endpoints.MapPost("/api/requests/{requestId:guid}/quotes", CreateQuoteAsync);
 
         var group = endpoints.MapGroup("/api/requests/{requestId:guid}/quotes/{quoteId:guid}");
 
-        // AD-15: reads carry a weak ETag so a client can round-trip it as If-Match.
+        // Reads carry a weak ETag so a client can round-trip it as If-Match.
         group.MapGet("", GetQuoteAsync);
 
-        // AD-2: the one action-driven transition endpoint. No [Authorize(Roles = ...)] here or
-        // anywhere near it - QuoteTransitions.Resolve, called inside ApplyQuoteAction, is the only
+        // The one action-driven transition endpoint. No [Authorize(Roles = ...)] here or anywhere
+        // near it - QuoteTransitions.Resolve, called inside ApplyQuoteAction, is the only
         // authority on whether the actor's roles permit this action.
         group.MapPost("/transitions", ApplyActionAsync);
     }
@@ -61,7 +61,7 @@ public static class QuoteEndpoints
 
         // Throws RequestNotEditableException (request already awarded/cancelled) or
         // QuoteTransitionNotAllowedException (wrong vendor organisation) - both are mapped by the
-        // DomainExceptionHandler (AD-8), so no try/catch belongs here.
+        // DomainExceptionHandler, so no try/catch belongs here.
         var quote = request.AddQuote(
             body.VendorOrganizationId,
             new Money(body.Amount, body.Currency),
@@ -134,7 +134,7 @@ public static class QuoteEndpoints
 
         // Throws a typed QuoteNotFoundInRequestException / QuoteTransitionNotAllowedException /
         // QuoteAlreadyAcceptedException / QuoteConcurrencyException on refusal - the
-        // DomainExceptionHandler maps every one of them, so no try/catch belongs here (AD-8).
+        // DomainExceptionHandler maps every one of them, so no try/catch belongs here.
         request.ApplyQuoteAction(quoteId, body.Action, currentUser.ToActor(), timeProvider.GetUtcNow(), expectedVersion);
 
         await db.SaveChangesAsync(cancellationToken);

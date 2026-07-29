@@ -81,6 +81,6 @@ public sealed class OrganizationsEndpointTests : IDisposable
         return client;
     }
 
-    /// <summary>The shape of the 400 the built-in minimal API validation (AD-8) returns.</summary>
+    /// <summary>The shape of the 400 the built-in minimal API validation returns.</summary>
     private sealed record ValidationProblemBody(Dictionary<string, string[]> Errors);
 }

@@ -11,10 +11,9 @@ using QuoteManager.Infrastructure.Persistence.Entities;
 namespace QuoteManager.Infrastructure.Persistence.Auditing;
 
 /// <summary>
-/// AD-4 and AD-5: on every <see cref="QuoteManagerDbContext.SaveChangesAsync(CancellationToken)"/>,
-/// appends one <see cref="AuditEntry"/> per domain event and, for events on the integration
-/// allow-list, one <see cref="OutboxMessage"/> - both inside the same transaction as the change
-/// that raised them.
+/// On every <see cref="QuoteManagerDbContext.SaveChangesAsync(CancellationToken)"/>, appends one
+/// <see cref="AuditEntry"/> per domain event and, for events on the integration allow-list, one
+/// <see cref="OutboxMessage"/> - both inside the same transaction as the change that raised them.
 /// </summary>
 /// <remarks>
 /// Combined into one interceptor deliberately, not split across two independently registered

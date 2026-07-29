@@ -6,10 +6,10 @@ namespace QuoteManager.Api.Models;
 /// The body of <c>POST /api/requests</c>.
 /// </summary>
 /// <remarks>
-/// AD-8: validated at the boundary via <see cref="IValidatableObject"/> rather than trusted to
-/// the domain alone - <see cref="ClientOrganizationId"/> being <see cref="Guid.Empty"/> is a
-/// client mistake worth a 400 naming the field, not a 404 from a lookup that was never going to
-/// find anything.
+/// Validated at the boundary via <see cref="IValidatableObject"/> rather than trusted to the
+/// domain alone - <see cref="ClientOrganizationId"/> being <see cref="Guid.Empty"/> is a client
+/// mistake worth a 400 naming the field, not a 404 from a lookup that was never going to find
+/// anything.
 /// </remarks>
 public sealed record CreateRequestRequest : IValidatableObject
 {

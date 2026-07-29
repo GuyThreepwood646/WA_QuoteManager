@@ -18,9 +18,9 @@ public sealed record ActivityEntryResponse(
     DateTimeOffset OccurredAt);
 
 /// <summary>
-/// FR-4/FR-5: the per-request activity timeline AD-5 names as the thing that reads
-/// <c>AuditEntry</c> directly - "what happened", laid out in one place instead of scattered across
-/// each screen re-deriving it from the entities it currently touches.
+/// The per-request activity timeline: reads <c>AuditEntry</c> directly for "what happened," laid
+/// out in one place instead of scattered across each screen re-deriving it from the entities it
+/// currently touches.
 /// </summary>
 public static class RequestActivityEndpoints
 {
@@ -46,9 +46,9 @@ public static class RequestActivityEndpoints
 
         var actor = currentUser.ToActor();
 
-        // Read-side half of AD-13, mirroring RequestEndpoints.GetRequestAsync exactly: a pure
-        // Vendor viewer must not learn a competitor's quote history - draft amounts, edits,
-        // withdrawals - through the timeline any more than through the quotes list itself. Every
+        // Mirrors RequestEndpoints.GetRequestAsync exactly: a pure Vendor viewer must not learn a
+        // competitor's quote history - draft amounts, edits, withdrawals - through the timeline
+        // any more than through the quotes list itself. Every
         // event whose SubjectType is Request (RequestCreated, VendorInvited, RequestAwarded,
         // RequestCancelled) names no vendor and carries no money in its Summary, so it is always
         // visible to anyone who can see the request at all; only Quote-subject rows need filtering.
