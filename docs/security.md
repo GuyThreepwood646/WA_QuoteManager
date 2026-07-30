@@ -28,7 +28,7 @@ additionally checks the caller's organization id against the resource's owning o
 (`DomainActor.CanActForVendorOrganization`) so a role alone is never enough to act on someone
 else's data. Full detail: [User Roles → Role-based security](user-roles.md#role-based-security).
 
-## IDOR protection: identical 404s
+## IDOR (Insecure Direct Object Reference) protection: identical 404s
 
 Two endpoints refuse a request the caller has no right to see or touch with the *same* `404` a
 truly nonexistent id would get, rather than a `403` that would confirm the id is real:
