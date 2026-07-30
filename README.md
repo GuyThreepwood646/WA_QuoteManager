@@ -13,18 +13,69 @@ inward).
 
 ---
 
+
+
 ## Documentation
 
 This README covers getting the project running locally. Deeper topics live in `docs/`:
 
-| Doc | Covers |
-| --- | --- |
-| [User Roles](docs/user-roles.md) | The four roles, what each can do, and how role-based authorization is wired end to end. |
-| [API Endpoints](docs/api.md) | Every `/api` route — auth, request/response shapes, errors, and the business logic behind each. |
-| [Security Overview](docs/security.md) | A single, high-level tour of how the app is secured — authentication, authorization, IDOR protections, CSP, secrets. |
-| [Database Schema](docs/database-schema.md) | Every table, its columns and indexes, relationships, and the migration history. |
+
+| Doc                                        | Covers                                                                                                               |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| [User Roles](docs/user-roles.md)           | The four roles, what each can do, and how role-based authorization is wired end to end.                              |
+| [API Endpoints](docs/api.md)               | Every `/api` route — auth, request/response shapes, errors, and the business logic behind each.                      |
+| [Security Overview](docs/security.md)      | A single, high-level tour of how the app is secured — authentication, authorization, IDOR protections, CSP, secrets. |
+| [Database Schema](docs/database-schema.md) | Every table, its columns and indexes, relationships, and the migration history.                                      |
+
 
 ---
+
+
+
+## Architecture
+
+`src/` holds five projects — four backend layers in a ports-and-adapters (hexagonal) arrangement,
+plus the frontend sitting entirely outside that dependency graph:
+
+```mermaid
+graph LR
+    subgraph dotnet [".NET solution — arrows point at what each layer depends on"]
+        Domain["QuoteManager.Domain<br/>entities, value objects, rules"]
+        Application["QuoteManager.Application<br/>ports (interfaces)"]
+        Infrastructure["QuoteManager.Infrastructure<br/>adapters: EF Core, JWT identity, messaging"]
+        Api["QuoteManager.Api<br/>HTTP endpoints, composition root"]
+
+        Application -->|depends on| Domain
+        Infrastructure -->|depends on| Application
+        Api -->|depends on| Application
+        Api -->|depends on| Infrastructure
+    end
+
+    Web["QuoteManager.Web<br/>(React SPA)"] -. HTTP only .-> Api
+```
+
+
+
+
+| Folder                        | Depends on                       | What it is                                                                                                                                                                                            |
+| ----------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `QuoteManager.Domain`         | *nothing*                        | Business entities, value objects, and the rules that govern state (e.g. quote transitions). No project references, no NuGet packages — it stays plain C#, testable with no host running.              |
+| `QuoteManager.Application`    | `Domain`                         | Declares the ports (`ICurrentUser`, `IIntegrationEventPublisher`) and cross-cutting contracts the domain needs but shouldn't implement itself — no framework or cloud package is allowed here either. |
+| `QuoteManager.Infrastructure` | `Application`                    | Implements those ports: EF Core/SQLite persistence, JWT-claims-based identity, and Service-Bus-or-in-process messaging. Swapping any of these out never touches `Domain` or `Application`.            |
+| `QuoteManager.Api`            | `Application` + `Infrastructure` | The composition root: HTTP endpoints, auth, error handling, DI wiring — and it also serves the built SPA's static files. The only project allowed to know about both a port and its concrete adapter. |
+| `QuoteManager.Web`            | *(none of the above)*            | A separate React/Vite project with no project reference into the .NET solution at all — it talks to `Api` purely over HTTP, the same way any external client would.                                   |
+
+
+The ordering is the point: dependencies only ever point inward, so a business rule in `Domain`
+never depends on a technical decision (which database, which web framework, which cloud provider).
+This isn't just convention — `tests/QuoteManager.Architecture.Tests/DependencyRuleTests.cs` reads
+every `.csproj` directly and fails the build if `Domain` gains any reference, if `Application`
+references anything but `Domain`, if `Infrastructure` references anything but `Application`, or if
+anything at all references `Api`.
+
+---
+
+
 
 ## Project Setup
 
@@ -101,7 +152,7 @@ The seeded database includes one account per role, all sharing the password belo
 
 
 | Email                              | Role      | Organization                      |
-| ---------------------------------- | --------- | ---------------------------------- |
+| ---------------------------------- | --------- | --------------------------------- |
 | `admin@warehouseanywhere.test`     | Admin     | — (platform staff)                |
 | `requester@warehouseanywhere.test` | Requester | Meridian Pharma Sampling (client) |
 | `reviewer@warehouseanywhere.test`  | Reviewer  | Palmetto Retail & CPG (client)    |
@@ -122,14 +173,17 @@ be edited (including changing this password) from the Users screen — see
 Defaults live in `src/QuoteManager.Api/appsettings.json` and need no changes to run locally:
 
 
-| Setting                          | Default                                | Purpose                                                                                                                                                                          |
-| -------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ConnectionStrings:QuoteManager` | `Data Source=quotemanager.db`          | SQLite file path (gitignored, created on first run).                                                                                                                             |
-| `Jwt:SigningKey`                 | a committed demo key                   | HS256 signing key for bearer tokens. **Not fit for production** — swap it via environment variable / user secrets before deploying anywhere real.                                |
-| `Jwt:Issuer` / `Jwt:Audience`    | `QuoteManager` / `QuoteManager.Client` | Token validation parameters.                                                                                                                                                     |
-| `AzureMonitor:ConnectionString`  | unset                                  | If present, OpenTelemetry exports to Azure Monitor. Absent by default — telemetry still works locally via the console/OTel pipeline.                                             |
-| `ServiceBus:ConnectionString`    | unset                                  | If present, integration events publish to Azure Service Bus. Absent by default — an in-process channel adapter is used instead, so outbox/messaging works with zero cloud setup. |
+| Setting                          | Default                                | Purpose                                                                                                                                                                              |
+| -------------------------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ConnectionStrings:QuoteManager` | `Data Source=quotemanager.db`          | SQLite file path (gitignored, created on first run).                                                                                                                                 |
+| `Jwt:SigningKey`                 | a committed demo key                   | HS256 signing key for bearer tokens. **Not fit for production** — swap it via environment variable / user secrets before deploying anywhere real.                                    |
+| `Jwt:Issuer` / `Jwt:Audience`    | `QuoteManager` / `QuoteManager.Client` | Token validation parameters.                                                                                                                                                         |
+| `AzureMonitor:ConnectionString`  | unset                                  | If present, OpenTelemetry exports to Azure Monitor. Absent by default — telemetry still works locally via the console/OTel pipeline.                                                 |
+| `ServiceBus:ConnectionString`    | unset                                  | If present, integration events publish to Azure Service Bus. Absent by default — an in-process channel adapter is used instead, so outbox/messaging works with zero cloud setup.     |
 | `KeyVault:Uri`                   | unset                                  | If present, secrets are additionally loaded from Azure Key Vault (see below). Absent by default — everything above reads from `appsettings.json` / user secrets / env vars as usual. |
+
+
+
 
 #### Secrets: Azure Key Vault (optional)
 
@@ -147,15 +201,15 @@ unset (the default), the call is skipped entirely and configuration works exactl
 ```
 
 - Authentication uses `DefaultAzureCredential` — a managed identity when running in Azure, or the
-  logged-in `az`/Visual Studio/VS Code credential for local development against a real vault. No
-  vault secret or connection string is ever hardcoded to reach it.
+logged-in `az`/Visual Studio/VS Code credential for local development against a real vault. No
+vault secret or connection string is ever hardcoded to reach it.
 - Key Vault secret names can't contain `:`, so nested keys use `--` instead — the signing key above
-  would be stored as a secret literally named `Jwt--SigningKey`.
+would be stored as a secret literally named `Jwt--SigningKey`.
 - **This repository has no Azure subscription to point at**, so only the *absent* path — the actual
-  default, exercised by every test in the suite — is verified end to end. The *present* path is
-  scaffolding: it follows the standard, documented `Azure.Extensions.AspNetCore.Configuration.Secrets`
-  integration and is straightforward to verify against a real vault, but that verification hasn't
-  been (and can't be) done here.
+default, exercised by every test in the suite — is verified end to end. The *present* path is
+scaffolding: it follows the standard, documented `Azure.Extensions.AspNetCore.Configuration.Secrets`
+integration and is straightforward to verify against a real vault, but that verification hasn't
+been (and can't be) done here.
 
 
 
@@ -182,3 +236,4 @@ npm install
 npx playwright install chromium   # first time only
 npx playwright test
 ```
+
