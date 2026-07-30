@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { Navigate, useLocation, useNavigate } from 'react-router'
 
 import { ApiError } from '../api/apiClient'
 import { useAuth } from '../auth/AuthProvider'
@@ -17,7 +17,7 @@ import {
 } from '@/lib/form-validation'
 
 export function LoginPage() {
-  const { login } = useAuth()
+  const { session, isReady, login } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [email, setEmail] = useState('')
@@ -27,6 +27,10 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const redirectTo = (location.state as { from?: string } | null)?.from ?? '/'
+
+  if (isReady && session) {
+    return <Navigate to={redirectTo === '/login' ? '/' : redirectTo} replace />
+  }
 
   function validateForm(): FieldErrors {
     const next: FieldErrors = {}

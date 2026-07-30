@@ -44,6 +44,11 @@ export function subscribeToSession(listener: () => void): () => void {
   return () => listeners.delete(listener)
 }
 
+function isExpired(candidate: AuthSession): boolean {
+  const expiresAt = Date.parse(candidate.expiresAt)
+  return Number.isNaN(expiresAt) || expiresAt <= Date.now()
+}
+
 /** Rehydrates from sessionStorage once, at module load, so a page refresh does not log a user out. */
 export function restoreSession(): AuthSession | null {
   const raw = sessionStorage.getItem(storageKey)
@@ -52,10 +57,18 @@ export function restoreSession(): AuthSession | null {
   }
 
   try {
-    session = JSON.parse(raw) as AuthSession
+    const candidate = JSON.parse(raw) as AuthSession
+    if (!candidate.accessToken || isExpired(candidate)) {
+      sessionStorage.removeItem(storageKey)
+      session = null
+      return null
+    }
+
+    session = candidate
     return session
   } catch {
     sessionStorage.removeItem(storageKey)
+    session = null
     return null
   }
 }
