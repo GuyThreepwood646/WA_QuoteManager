@@ -19,9 +19,6 @@ below for why, and how that's wired.
 
 ## Role-based security
 
-Yes — this is fully implemented, and entirely local (no Azure AD, no external identity provider,
-no paid service of any kind):
-
 - **Authentication**: stateless JWT bearer tokens, HS256-signed with a key from configuration,
 issued by `POST /api/auth/login` after verifying a password hash created with ASP.NET Core
 Identity's `PasswordHasher`. Tokens live 8 hours.
