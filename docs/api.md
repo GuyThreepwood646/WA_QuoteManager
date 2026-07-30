@@ -84,8 +84,7 @@ decoding the JWT client-side, and doubles as the anonymous-set test's one protec
 
 #### `GET /api/dashboard`
 
-**Auth:** any authenticated user (every role sees the same triage data; only each quote's
-`permittedActions` — see below — differs by role/organization).
+**Auth:** any authenticated user; a pure Vendor viewer sees a narrower slice — see business logic.
 
 **JSON input:** none.
 
@@ -93,20 +92,31 @@ decoding the JWT client-side, and doubles as the anonymous-set test's one protec
 
 ```jsonc
 {
-  "quotesNeedingReview": [ /* QuoteTriageItem */ ],
-  "quotesUnderReview": [ /* QuoteTriageItem */ ],
-  "quotesExpiringSoon": [ /* QuoteTriageItem */ ],
-  "requestsAwaitingResponse": [ /* RequestAwaitingResponseItem */ ]
+  "kpis": { /* DashboardKpis */ },
+  "requests": [ /* DashboardRequestItem */ ]
 }
 ```
 
-`QuoteTriageItem`:
+`DashboardRequestItem` — one per request that currently needs attention:
+
+```jsonc
+{
+  "requestId": "guid",
+  "title": "string",
+  "clientOrganizationName": "string",
+  "neededBy": "datetime|null",
+  "createdAt": "datetime",
+  "quotes": [ /* DashboardQuoteItem */ ],
+  "awaitingVendorNames": ["string"]
+}
+```
+
+`DashboardQuoteItem`:
 
 ```jsonc
 {
   "quoteId": "guid",
-  "requestId": "guid",
-  "requestTitle": "string",
+  "vendorOrganizationId": "guid",
   "vendorOrganizationName": "string",
   "amount": 0.00,
   "currency": "string",
@@ -114,38 +124,62 @@ decoding the JWT client-side, and doubles as the anonymous-set test's one protec
   "expiresAt": "datetime|null",
   "statusChangedAt": "datetime",
   "version": 0,
+  "isExpiringSoon": false,
   "permittedActions": ["string"]
 }
 ```
 
-`RequestAwaitingResponseItem`:
+`DashboardKpis` — platform-wide counters, *not* scoped to the "needs attention" set above:
 
 ```jsonc
 {
-  "requestId": "guid",
-  "title": "string",
-  "clientOrganizationName": "string",
-  "createdAt": "datetime",
-  "awaitingVendorNames": ["string"]
+  "openRequestCount": 0,
+  "quotesAwaitingDecisionCount": 0,
+  "requestsOpenedThisMonth": 0,
+  "requestsClosedThisMonth": 0,
+  "vendorResponseRatePercent": 0.0
 }
 ```
 
-**Business logic:** this is a pure read model — a single-purpose triage surface, not a
-filtered view of one big list, built from four independent projections over the same
-`Quotes`/`Requests`/`Organizations`/`RequestInvitations` tables:
+**Business logic:** this is a request-centric triage surface — one card per request, not four
+independent quote-level buckets. A request appears at all only if `Status == Open` **and** at
+least one of: a quote is `Submitted`/`UnderReview`, a quote is "expiring soon" (`Submitted`/
+`UnderReview` and `expiresAt` within 3 days of now, via the injected `TimeProvider`, never
+wall-clock time), or an invited vendor has no quote yet. **Once a request qualifies, every quote on
+it is included**, not just the one that triggered inclusion — a request with three vendor quotes in
+three different states is one card with three sub-rows, not three separate, seemingly-unrelated
+entries.
 
-- **Needs your review** — every quote in `Submitted` status (oldest first).
-- **Under review** — every quote in `UnderReview` status.
-- **Expiring soon** — any `Submitted`/`UnderReview` quote whose `expiresAt` falls within 3 days of
-now (using the injected `TimeProvider`, never wall-clock time, so this is deterministic under
-test).
-- **Awaiting vendor response** — open requests where at least one invited vendor organization has
-not yet drafted *any* quote; each entry lists every silent vendor by name. A request that's been
-awarded or cancelled never appears here even if a vendor never replied.
+**Sort order — nearest deadline first:** each request is ordered by
+`Min(neededBy, each non-terminal quote's expiresAt)` ascending (a resolved quote's `expiresAt` no
+longer represents anything actionable, so `Draft`/`Submitted`/`UnderReview` quotes only); a request
+with no deadline anywhere sorts last, tie-broken by `createdAt`.
 
-Each quote's `permittedActions` is computed the same way the quote endpoints compute it (see
-below) for the *calling* user — so two different users hitting this same endpoint see the same
-quotes, but different action buttons.
+**Vendor visibility** — reuses the same rule `GET /api/requests/{requestId}` already applies
+(`RequestEndpoints.IsVendorOnlyView`): a pure Vendor viewer (Vendor role and nothing else) only
+sees a card if *their own* organization's quote or invitation is what qualifies it, and within that
+card only their own quote/invitation row — never a competitor's amount or status. Because of this,
+a Vendor who hasn't quoted yet sees their own organization's name reflected back in
+`awaitingVendorNames`; the frontend renders this as "Awaiting your response" rather than listing
+their own name. Non-vendor viewers (Admin/Reviewer/Requester) see every quote on every qualifying
+request, same as today.
+
+**KPI definitions:**
+
+- `openRequestCount` — every `Request` with `Status == Open`. Unscoped (same number for every
+role) — not competitively sensitive, and meaningful platform-wide context regardless of who's
+asking.
+- `quotesAwaitingDecisionCount` — quotes with `Status` `Submitted` or `UnderReview`. Scoped like
+the request list above: a pure Vendor viewer sees only their own organization's count.
+- `requestsOpenedThisMonth` / `requestsClosedThisMonth` — requests created, or awarded/cancelled
+(read from the `AuditEntry` audit trail, not derived), within the current UTC calendar month.
+Unscoped.
+- `vendorResponseRatePercent` — the percentage of all `RequestInvitations`, across every request
+regardless of status, that have ever received a quote from that vendor (any quote status counts as
+"responded," including a since-withdrawn or expired one — it proves the vendor engaged). **`null`
+for a pure Vendor viewer** — this is aggregate information about vendor performance in general,
+which a Vendor account isn't shown, the same reasoning that keeps a competitor's quote amount
+hidden from them elsewhere. Also `null` if there are no invitations at all (avoids a divide-by-zero).
 
 ## Requests
 

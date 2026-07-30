@@ -20,12 +20,22 @@ export function validateRequired(value: string, label = 'This field'): string | 
   }
 }
 
+/**
+ * Strips currency symbols, commas, and spaces from amount input.
+ * Examples: "$1,234.56" → "1234.56", "€ 1.000,50" → "1000.50"
+ */
+export function parseAmountInput(value: string): string {
+  // Remove currency symbols, commas, and spaces, but keep digits, dots, and minus
+  return value.replace(/[$€£¥₹,\s]/g, '')
+}
+
 export function validatePositiveAmount(value: string): string | undefined {
   if (value.trim() === '') {
     return 'Amount is required.'
   }
 
-  const amount = Number(value)
+  const cleaned = parseAmountInput(value)
+  const amount = Number(cleaned)
   if (!Number.isFinite(amount) || amount <= 0) {
     return 'Enter an amount greater than zero.'
   }

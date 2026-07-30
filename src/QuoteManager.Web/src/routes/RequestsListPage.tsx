@@ -8,7 +8,7 @@ import { StatusBadge } from '@/components/status-badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatDaysUntil } from '@/lib/format'
 
 export function RequestsListPage() {
   const navigate = useNavigate()
@@ -67,7 +67,14 @@ export function RequestsListPage() {
                 </TableCell>
                 <TableCell className="text-right">{request.quoteCount}</TableCell>
                 <TableCell className="text-muted-foreground">
-                  {request.neededBy ? formatDate(request.neededBy) : '—'}
+                  {request.neededBy ? (
+                    <>
+                      {formatDate(request.neededBy)}
+                      <span className="block text-xs">{formatDaysUntil(request.neededBy)}</span>
+                    </>
+                  ) : (
+                    '—'
+                  )}
                 </TableCell>
               </TableRow>
             ))}

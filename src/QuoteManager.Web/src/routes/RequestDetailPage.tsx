@@ -6,17 +6,16 @@ import { Link, useParams } from 'react-router'
 
 import { ApiError } from '@/api/apiClient'
 import { listOrganizations } from '@/api/organizations'
-import { cancelRequest, getRequest, inviteVendor, updateRequest } from '@/api/requests'
+import { cancelRequest, getRequest, updateRequest } from '@/api/requests'
 import { ActivityTimeline } from '@/components/activity-timeline'
-import { AddQuoteForm } from '@/components/add-quote-form'
 import { FormField } from '@/components/form-field'
 import { QuoteCard } from '@/components/quote-card'
 import { StatusBadge } from '@/components/status-badge'
+import { VendorIntakeSection } from '@/components/vendor-intake-section'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatDate } from '@/lib/format'
+import { formatDate, formatDaysUntil } from '@/lib/format'
 import {
   type FieldErrors,
   clearFieldError,
@@ -31,7 +30,6 @@ export function RequestDetailPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [neededBy, setNeededBy] = useState('')
-  const [vendorToInvite, setVendorToInvite] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
 
@@ -69,17 +67,6 @@ export function RequestDetailPage() {
       setError(null)
       void queryClient.invalidateQueries({ queryKey: ['requests', requestId] })
       void queryClient.invalidateQueries({ queryKey: ['requests'] })
-      void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-    },
-    onError: (err) => setError(err instanceof ApiError ? err.message : 'Something went wrong.'),
-  })
-
-  const inviteMutation = useMutation({
-    mutationFn: () => inviteVendor(requestId!, vendorToInvite),
-    onSuccess: () => {
-      setError(null)
-      setVendorToInvite('')
-      void queryClient.invalidateQueries({ queryKey: ['requests', requestId] })
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Something went wrong.'),
@@ -123,159 +110,139 @@ export function RequestDetailPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <Link to="/requests" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" />
-        Back to requests
-      </Link>
+    <div className="flex gap-6">
+      <div className="flex min-w-0 flex-1 flex-col gap-6">
+        <Link to="/requests" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="size-4" />
+          Back to requests
+        </Link>
 
-      {error && (
-        <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-
-      {isEditing ? (
-        <form onSubmit={handleUpdateSubmit} noValidate className="flex max-w-xl flex-col gap-4">
-          <FormField id="title" label="Title" error={fieldErrors.title}>
-            <Input
-              value={title}
-              onChange={(event) => {
-                setTitle(event.currentTarget.value)
-                setFieldErrors((current) => clearFieldError(current, 'title'))
-              }}
-              maxLength={200}
-            />
-          </FormField>
-          <FormField id="description" label="Description">
-            <Input
-              value={description}
-              onChange={(event) => setDescription(event.currentTarget.value)}
-              maxLength={2000}
-            />
-          </FormField>
-          <FormField id="neededBy" label="Needed by">
-            <Input
-              type="date"
-              value={neededBy}
-              onChange={(event) => setNeededBy(event.currentTarget.value)}
-            />
-          </FormField>
-          <div className="flex gap-2">
-            <Button type="submit" size="sm" disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'Saving…' : 'Save'}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setIsEditing(false)
-                setFieldErrors({})
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
-        </form>
-      ) : (
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-semibold">{data.title}</h1>
-            <p className="text-sm text-muted-foreground">
-              {data.clientOrganizationName}
-              {data.neededBy && <> · needed by {formatDate(data.neededBy)}</>}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <StatusBadge status={data.status} />
-            {data.canEdit && (
-              <Button size="sm" variant="outline" onClick={startEditing}>
-                Edit
-              </Button>
-            )}
-            {data.canCancel && (
-              <Button
-                size="sm"
-                variant="destructive"
-                disabled={cancelMutation.isPending}
-                onClick={() => {
-                  if (window.confirm('Cancel this request? This cannot be undone.')) {
-                    cancelMutation.mutate()
-                  }
-                }}
-              >
-                Cancel request
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {!isEditing && data.description && <p className="max-w-2xl text-sm text-muted-foreground">{data.description}</p>}
-
-      <div className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold">Quotes</h2>
-        {data.quotes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No quotes yet.</p>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {data.quotes.map((quote) => (
-              <QuoteCard key={quote.id} requestId={data.id} quote={quote} readOnly={data.status !== 'Open'} />
-            ))}
+        {error && (
+          <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
           </div>
         )}
-      </div>
 
-      {silentInvitations.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold">Invited, no quote yet</h2>
-          <p className="text-sm text-muted-foreground">
-            {silentInvitations.map((invitation) => invitation.vendorOrganizationName).join(', ')}
-          </p>
-        </div>
-      )}
-
-      {data.canInviteVendor && (
-        <div className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold">Invite a vendor</h2>
-          <div className="flex max-w-md gap-2">
-            <Select value={vendorToInvite} onValueChange={setVendorToInvite}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={availableVendors.length === 0 ? 'No more vendors to invite' : 'Select a vendor'} />
-              </SelectTrigger>
-              <SelectContent>
-                {availableVendors.map((org) => (
-                  <SelectItem key={org.id} value={org.id}>
-                    {org.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              size="sm"
-              disabled={vendorToInvite === '' || inviteMutation.isPending}
-              onClick={() => inviteMutation.mutate()}
-            >
-              {inviteMutation.isPending ? 'Inviting…' : 'Invite'}
-            </Button>
+        {isEditing ? (
+          <form onSubmit={handleUpdateSubmit} noValidate className="flex max-w-xl flex-col gap-4">
+            <FormField id="title" label="Title" error={fieldErrors.title}>
+              <Input
+                value={title}
+                onChange={(event) => {
+                  setTitle(event.currentTarget.value)
+                  setFieldErrors((current) => clearFieldError(current, 'title'))
+                }}
+                maxLength={200}
+              />
+            </FormField>
+            <FormField id="description" label="Description">
+              <Input
+                value={description}
+                onChange={(event) => setDescription(event.currentTarget.value)}
+                maxLength={2000}
+              />
+            </FormField>
+            <FormField id="neededBy" label="Needed by">
+              <Input
+                type="date"
+                value={neededBy}
+                onChange={(event) => setNeededBy(event.currentTarget.value)}
+              />
+            </FormField>
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? 'Saving…' : 'Save'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setIsEditing(false)
+                  setFieldErrors({})
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-lg font-semibold">{data.title}</h1>
+              <p className="text-sm text-muted-foreground">
+                {data.clientOrganizationName}
+                {data.neededBy && (
+                  <> · needed by {formatDate(data.neededBy)} ({formatDaysUntil(data.neededBy)})</>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <StatusBadge status={data.status} />
+              {data.canEdit && (
+                <Button size="sm" variant="outline" onClick={startEditing}>
+                  Edit
+                </Button>
+              )}
+              {data.canCancel && (
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={cancelMutation.isPending}
+                  onClick={() => {
+                    if (window.confirm('Cancel this request? This cannot be undone.')) {
+                      cancelMutation.mutate()
+                    }
+                  }}
+                >
+                  Cancel request
+                </Button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {data.canAddQuote && (
-        <AddQuoteForm
+        {!isEditing && data.description && <p className="max-w-2xl text-sm text-muted-foreground">{data.description}</p>}
+
+        <div className="flex flex-col gap-3">
+          <h2 className="text-sm font-semibold">Quotes</h2>
+          {data.quotes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No quotes yet.</p>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {data.quotes.map((quote) => (
+                <QuoteCard key={quote.id} requestId={data.id} quote={quote} readOnly={data.status !== 'Open'} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {silentInvitations.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <h2 className="text-sm font-semibold">Invited, no quote yet</h2>
+            <p className="text-sm text-muted-foreground">
+              {silentInvitations.map((invitation) => invitation.vendorOrganizationName).join(', ')}
+            </p>
+          </div>
+        )}
+
+        <VendorIntakeSection
           requestId={data.id}
+          canInviteVendor={data.canInviteVendor}
+          canAddQuote={data.canAddQuote}
+          availableInviteVendors={availableVendors}
           quotedVendorIds={data.quotes
             .filter((quote) => !['Withdrawn', 'Expired', 'Rejected'].includes(quote.status))
             .map((quote) => quote.vendorOrganizationId)}
         />
-      )}
-
-      <div className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold">Activity</h2>
-        <ActivityTimeline requestId={data.id} />
       </div>
+
+      <aside className="w-72 shrink-0">
+        <div className="sticky top-0 flex flex-col gap-3">
+          <h2 className="text-sm font-semibold">Activity</h2>
+          <ActivityTimeline requestId={data.id} />
+        </div>
+      </aside>
     </div>
   )
 }

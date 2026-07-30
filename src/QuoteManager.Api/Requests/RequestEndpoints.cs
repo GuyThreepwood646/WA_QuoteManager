@@ -28,8 +28,11 @@ public sealed record RequestQuoteItem(
     string Currency,
     DateTimeOffset? ExpiresAt,
     string? Notes,
+    DateTimeOffset CreatedAt,
     DateTimeOffset StatusChangedAt,
     string? StatusReason,
+    DateTimeOffset? LastActivityAt,
+    string? LastActivityNote,
     int Version,
     IReadOnlyList<string> PermittedActions);
 
@@ -263,6 +266,23 @@ public static class RequestEndpoints
             .Where(o => organizationIds.Contains(o.Id))
             .ToDictionaryAsync(o => o.Id, o => o.Name, cancellationToken);
 
+        // Fetch the most recent activity (audit entry) for each visible quote. Grouped in memory,
+        // not via a server-side GroupBy().Select(g => g.OrderBy(...).FirstOrDefault()) - that shape
+        // (an entity-valued FirstOrDefault inside a grouped projection) hits a known EF Core query-
+        // translation bug against the SQLite provider, which corrupts the shared compiled-query
+        // cache for the process and causes unrelated queries elsewhere to start failing.
+        var quoteIds = visibleQuotes.Select(q => q.Id).ToList();
+        var quoteActivityRows = await db.AuditEntries.AsNoTracking()
+            .Where(e => e.SubjectType == nameof(Quote) && quoteIds.Contains(e.SubjectId))
+            .Select(e => new { e.SubjectId, e.OccurredAt, e.Id, e.Note })
+            .ToListAsync(cancellationToken);
+
+        var quoteLastActivity = quoteActivityRows
+            .GroupBy(row => row.SubjectId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderByDescending(row => row.OccurredAt).ThenByDescending(row => row.Id).First());
+
         // HasQuoted ignores inactive quotes (Withdrawn/Expired/Rejected) — those vendors may revise or draft anew.
         var quotedVendorIds = VendorsWithActiveQuotes(request.Quotes);
 
@@ -282,23 +302,30 @@ public static class RequestEndpoints
             request.IsEditable && canActOnRequest,
             request.Status == RequestStatus.Open && canActOnRequest,
             request.Status == RequestStatus.Open && canActOnRequest,
-            visibleQuotes.Select(quote => new RequestQuoteItem(
-                quote.Id,
-                quote.VendorOrganizationId,
-                organizationNames.GetValueOrDefault(quote.VendorOrganizationId, "Unknown"),
-                quote.Status.ToString(),
-                quote.Amount.Amount,
-                quote.Amount.CurrencyCode,
-                quote.ExpiresAt,
-                quote.Notes,
-                quote.StatusChangedAt,
-                quote.StatusReason,
-                quote.Version,
-                request.Status == RequestStatus.Open
-                    ? QuoteTransitions.PermittedFor(quote.Status, actor, quote.VendorOrganizationId)
-                        .Select(a => a.ToString())
-                        .ToList()
-                    : []))
+            visibleQuotes.Select(quote =>
+            {
+                var lastActivity = quoteLastActivity.GetValueOrDefault(quote.Id);
+                return new RequestQuoteItem(
+                    quote.Id,
+                    quote.VendorOrganizationId,
+                    organizationNames.GetValueOrDefault(quote.VendorOrganizationId, "Unknown"),
+                    quote.Status.ToString(),
+                    quote.Amount.Amount,
+                    quote.Amount.CurrencyCode,
+                    quote.ExpiresAt,
+                    quote.Notes,
+                    quote.CreatedAt,
+                    quote.StatusChangedAt,
+                    quote.StatusReason,
+                    lastActivity?.OccurredAt,
+                    lastActivity?.Note,
+                    quote.Version,
+                    request.Status == RequestStatus.Open
+                        ? QuoteTransitions.PermittedFor(quote.Status, actor, quote.VendorOrganizationId)
+                            .Select(a => a.ToString())
+                            .ToList()
+                        : []);
+            })
                 .ToList(),
             visibleInvitations.Select(invitation => new RequestInvitationItem(
                 invitation.VendorOrganizationId,

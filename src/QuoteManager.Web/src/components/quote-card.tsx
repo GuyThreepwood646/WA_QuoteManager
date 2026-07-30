@@ -8,11 +8,12 @@ import { ApiError } from '@/api/apiClient'
 import { FormField, FormFieldRow, textareaClassName } from '@/components/form-field'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { formatDate, formatMoney } from '@/lib/format'
+import { formatDate, formatDaysUntil, formatMoney } from '@/lib/format'
 import {
   type FieldErrors,
   clearFieldError,
   hasFieldErrors,
+  parseAmountInput,
   validateCurrencyCode,
   validatePositiveAmount,
 } from '@/lib/form-validation'
@@ -77,7 +78,18 @@ export function QuoteCard({
       setError(null)
       setFieldErrors({})
     }
-  }, [readOnly, quote.id, quote.status, quote.version, quote.amount, quote.currency, quote.expiresAt, quote.notes])
+  }, [
+    readOnly,
+    quote.id,
+    quote.status,
+    quote.version,
+    quote.amount,
+    quote.currency,
+    quote.expiresAt,
+    quote.notes,
+    quote.lastActivityAt,
+    quote.lastActivityNote,
+  ])
 
   const actionMutation = useMutation({
     mutationFn: ({ action, note }: { action: string; note?: string }) => applyQuoteAction(requestId, quote, action, note),
@@ -95,7 +107,7 @@ export function QuoteCard({
   const editMutation = useMutation({
     mutationFn: () =>
       editQuote(requestId, quote, {
-        amount: Number(amount),
+        amount: Number(parseAmountInput(amount)),
         currency,
         expiresAt: expiresAt === '' ? undefined : new Date(expiresAt).toISOString(),
         notes: notes.trim() === '' ? undefined : notes,
@@ -150,7 +162,9 @@ export function QuoteCard({
           {!isEditing && (
             <p className="text-sm text-muted-foreground">
               {formatMoney(quote.amount, quote.currency)}
-              {quote.expiresAt && <> · expires {formatDate(quote.expiresAt)}</>}
+              {quote.expiresAt && (
+                <> · expires {formatDate(quote.expiresAt)} ({formatDaysUntil(quote.expiresAt)})</>
+              )}
             </p>
           )}
         </div>
@@ -158,6 +172,18 @@ export function QuoteCard({
       </div>
 
       {!isEditing && quote.notes && <p className="text-sm text-muted-foreground">{quote.notes}</p>}
+
+      {!isEditing && quote.lastActivityAt && (
+        <p className="text-xs text-muted-foreground">
+          Last activity: {formatDate(quote.lastActivityAt)}
+          {quote.lastActivityNote && (
+            <>
+              {' '}
+              — <span className="italic">{quote.lastActivityNote}</span>
+            </>
+          )}
+        </p>
+      )}
 
       {!isEditing && quote.statusReason && (
         <p className="text-sm italic text-muted-foreground">
@@ -181,9 +207,9 @@ export function QuoteCard({
                 error: fieldErrors.amount,
                 children: (
                   <Input
-                    type="number"
-                    min={0.01}
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="1,234.56"
                     value={amount}
                     onChange={(event) => {
                       setAmount(event.currentTarget.value)

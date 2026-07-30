@@ -5,10 +5,9 @@ export interface PagedResult<T> {
   total: number
 }
 
-export interface QuoteTriageItem {
+export interface DashboardQuoteItem {
   quoteId: string
-  requestId: string
-  requestTitle: string
+  vendorOrganizationId: string
   vendorOrganizationName: string
   amount: number
   currency: string
@@ -16,22 +15,31 @@ export interface QuoteTriageItem {
   expiresAt: string | null
   statusChangedAt: string
   version: number
+  isExpiringSoon: boolean
   permittedActions: string[]
 }
 
-export interface RequestAwaitingResponseItem {
+export interface DashboardRequestItem {
   requestId: string
   title: string
   clientOrganizationName: string
+  neededBy: string | null
   createdAt: string
+  quotes: DashboardQuoteItem[]
   awaitingVendorNames: string[]
 }
 
+export interface DashboardKpis {
+  openRequestCount: number
+  quotesAwaitingDecisionCount: number
+  requestsOpenedThisMonth: number
+  requestsClosedThisMonth: number
+  vendorResponseRatePercent: number | null
+}
+
 export interface DashboardResponse {
-  quotesNeedingReview: QuoteTriageItem[]
-  quotesUnderReview: QuoteTriageItem[]
-  quotesExpiringSoon: QuoteTriageItem[]
-  requestsAwaitingResponse: RequestAwaitingResponseItem[]
+  kpis: DashboardKpis
+  requests: DashboardRequestItem[]
 }
 
 export interface RequestListItem {
@@ -53,8 +61,11 @@ export interface RequestQuoteItem {
   currency: string
   expiresAt: string | null
   notes: string | null
+  createdAt: string
   statusChangedAt: string
   statusReason: string | null
+  lastActivityAt: string | null
+  lastActivityNote: string | null
   version: number
   permittedActions: string[]
 }
