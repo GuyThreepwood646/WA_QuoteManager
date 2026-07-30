@@ -21,4 +21,7 @@ public interface IDomainEvent
     Guid ActorId { get; }
 
     DateTimeOffset OccurredAt { get; }
+
+    /// <summary>Optional free-text note the actor typed when they made this happen. Most events don't carry one.</summary>
+    string? Note => null;
 }

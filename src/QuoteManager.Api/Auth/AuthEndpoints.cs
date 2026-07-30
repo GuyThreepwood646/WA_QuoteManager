@@ -47,7 +47,7 @@ public static class AuthEndpoints
         return Results.Ok(new LoginResponse(
             issued.AccessToken,
             issued.ExpiresAt,
-            new CurrentUserResponse(user.Id, user.DisplayName, RoleNames(user.Roles), user.OrganizationId)));
+            new CurrentUserResponse(user.Id, user.DisplayName, user.Roles.Names(), user.OrganizationId)));
     }
 
     private static IResult InvalidCredentials() => Results.Problem(
@@ -59,9 +59,6 @@ public static class AuthEndpoints
     private static CurrentUserResponse ToResponse(ICurrentUser currentUser) => new(
         currentUser.UserId,
         currentUser.DisplayName,
-        RoleNames(currentUser.Roles),
+        currentUser.Roles.Names(),
         currentUser.OrganizationId);
-
-    private static List<string> RoleNames(AppRole roles) =>
-        roles.Split().Select(role => role.ToString()).ToList();
 }

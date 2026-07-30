@@ -215,7 +215,7 @@ public sealed class Request : AggregateRoot
         if (from != resulting)
         {
             quote.ApplyStatus(resulting, now);
-            Raise(new QuoteStatusChanged(Id, quoteId, QuoteAction.Edit, from, resulting, null, actor.Id, now));
+            Raise(new QuoteStatusChanged(Id, quoteId, QuoteAction.Edit, from, resulting, null, null, actor.Id, now));
         }
 
         Raise(new QuoteEdited(Id, quoteId, amount, actor.Id, now));
@@ -231,7 +231,8 @@ public sealed class Request : AggregateRoot
         QuoteAction action,
         DomainActor actor,
         DateTimeOffset now,
-        int? expectedVersion = null)
+        int? expectedVersion = null,
+        string? note = null)
     {
         if (action == QuoteAction.Edit)
         {
@@ -256,7 +257,7 @@ public sealed class Request : AggregateRoot
 
         var from = quote.Status;
         quote.ApplyStatus(resulting, now);
-        Raise(new QuoteStatusChanged(Id, quoteId, action, from, resulting, null, actor.Id, now));
+        Raise(new QuoteStatusChanged(Id, quoteId, action, from, resulting, null, note, actor.Id, now));
 
         if (action != QuoteAction.Accept)
         {
@@ -284,6 +285,7 @@ public sealed class Request : AggregateRoot
                 siblingFrom,
                 QuoteStatus.Rejected,
                 superseded,
+                null,
                 actor.Id,
                 now));
         }

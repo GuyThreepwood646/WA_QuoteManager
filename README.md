@@ -102,7 +102,8 @@ The seeded database includes one account per role, all sharing the password belo
 **Password (all accounts):** `Demo!2345`
 
 This password is deliberately not secret — it's published here on purpose, and the seed hashes it
-the same way a real signup would.
+the same way a real signup would. Each account also has a seeded address and phone number, and can
+be edited (including changing this password) from the Users screen — see [Users](#users) below.
 
 ### Configuration
 
@@ -499,7 +500,8 @@ support action; that's not surfaced as a screen, so it doesn't set this flag.)
   "action": "QuoteAccepted",
   "summary": "string",
   "actorDisplayName": "string",
-  "occurredAt": "datetime"
+  "occurredAt": "datetime",
+  "note": "string?"
 }
 ```
 
@@ -513,6 +515,11 @@ concern, not the audit source of truth). Applies the identical visibility rule a
 detail endpoint: a pure Vendor viewer only sees `Quote`-subject rows for their own organization's
 quote; every `Request`-subject row (created, vendor invited, awarded, cancelled) names no vendor
 and carries no money, so it's visible to anyone who can see the request at all.
+
+`note` is the free-text explanation an actor optionally typed when they made a quote transition
+(see `POST .../transitions` below) — `null` for every other kind of entry, and for a transition
+where nobody supplied one. It is carried as its own field rather than folded into `summary`, so the
+timeline can render the machine-generated sentence and the human's own words as two distinct lines.
 
 ### Quotes
 
@@ -598,13 +605,14 @@ The one action-driven lifecycle endpoint — there is no per-status verb endpoin
 | Field    | Type            | Validation                                                                                                                                                                               |
 | -------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `action` | `string` (enum) | Required; must be one of `Submit`, `StartReview`, `ReturnToSubmitted`, `Accept`, `Reject`, `Withdraw`, `Expire` (`Edit` is a recognised enum value but is rejected — see business logic) |
+| `note`   | `string?`       | Optional, max 2000 characters — a free-text explanation for this specific transition                                                                                                   |
 
 
 **JSON output —** `200 OK` (fresh `ETag` header): the updated `QuoteResponse`.
 
 **Errors:**
 
-- `400` validation problem — `action` isn't a recognised value.
+- `400` validation problem — `action` isn't a recognised value, or `note` exceeds 2000 characters.
 - `404` — request or quote not found.
 - `409` with `code: "quote.if_match_required"` — missing/unparseable `If-Match`.
 - `409` with `code: "quote.concurrent_modification"` — the `If-Match` version doesn't match the
@@ -643,6 +651,13 @@ Terminal states (no action legal from any of these, for anyone): `Accepted`, `Re
 signal for the UI, but is **not** a status transition — sending it to this endpoint is rejected
 before the transition table is even consulted, since it's a different kind of change (there is no
 dedicated edit-quote endpoint yet).
+
+**`note` explains *this* transition, not the quote's current state.** It is never stored on the
+quote itself (unlike `statusReason`, which the system alone sets for the one automatic case below)
+— it only ever reaches the request's activity timeline, as its own field on that transition's
+`ActivityEntryResponse` entry (see `GET .../activity` above). A reviewer rejecting a quote and
+typing "Price came in over budget" leaves that note attached to the `QuoteRejected` timeline entry;
+it does not change anything a later `GET` of the quote itself returns.
 
 **Accepting a quote has side effects beyond itself**, all inside the same database transaction:
 every sibling quote on the same request still in `Submitted` or `UnderReview` is automatically
@@ -778,6 +793,172 @@ panel calls on **Save**.
 **Business logic:** soft-deletes the organization (`RetiredAt` set). Existing requests, quotes,
 invitations, and user links are untouched; the organization simply stops appearing in pickers
 (`includeRetired=false`). Retiring again is a no-op.
+
+### Users
+
+User account management: creating accounts, editing profile fields, and changing passwords.
+Unlike `Organization`/`Request`, `AppUser` has no domain aggregate of its own — by design, so a
+password hash is never at risk of being treated as part of a business aggregate — so the
+permission checks below are enforced directly in the endpoint, using the same typed exceptions
+and RFC 9457 problem-details mapping every other feature uses.
+
+**Visibility is scoped, not blocked**: `GET /api/users` returns every user to an **Admin**, but
+anyone else's result is filtered to only their own row — the same "filter, don't refuse" rule
+`GET /api/requests` already applies to quote visibility for a Vendor. This is what lets one
+endpoint and one screen serve both the Admin's user directory and everyone else's "my profile"
+view. **Only an Admin can create a user or change anyone's roles/organization — including their
+own** (a non-Admin can only edit their own display name, email, address, and phone).
+
+`UserListItem` (returned by every users endpoint below):
+
+```jsonc
+{
+  "id": "guid",
+  "email": "string",
+  "displayName": "string",
+  "roles": ["Requester"],
+  "organizationId": "guid|null",
+  "organizationName": "string|null",
+  "address": "string|null",
+  "phone": "string|null"
+}
+```
+
+**Password requirements**, enforced identically wherever a password is set (creating a user or
+resetting one) — the UI shows this exact list, live, as red-X/green-check while typing:
+
+| Requirement | Rule |
+| --- | --- |
+| Length | At least 8 characters |
+| Uppercase | At least one uppercase letter |
+| Lowercase | At least one lowercase letter |
+| Number | At least one digit |
+| Special character | At least one non-alphanumeric character |
+
+#### `GET /api/users`
+
+**Auth:** any authenticated user.
+
+**JSON input:** query string — `page`, `pageSize`.
+
+**JSON output —** `200 OK`**:** paged envelope of `UserListItem`.
+
+**Business logic:** an **Admin** gets every user, ordered by display name. Anyone else gets a
+single-item result containing only their own row — there is no way for a non-Admin to enumerate
+or read any other user's email, address, or phone through this endpoint.
+
+#### `POST /api/users`
+
+**Auth:** any authenticated user, but only succeeds for **Admin**.
+
+**JSON input:**
+
+| Field | Type | Validation |
+| --- | --- | --- |
+| `email` | `string` | Required, valid email, unique |
+| `displayName` | `string` | Required, 1–200 characters |
+| `roles` | `string[]` | Required, non-empty, each one of `Requester`/`Reviewer`/`Vendor`/`Admin` |
+| `organizationId` | `guid?` | Required unless `roles` is exactly `["Admin"]`; must reference an existing organization |
+| `address` | `string?` | Optional, max 500 characters |
+| `phone` | `string?` | Optional, max 50 characters |
+| `password` | `string` | Required, must satisfy every rule above |
+| `confirmPassword` | `string` | Required, must equal `password` |
+
+**JSON output —** `201 Created`**:** the new `UserListItem`.
+
+**Errors:**
+
+- `400` validation problem — any field above fails its rule (each unmet password requirement is
+its own error against `password`).
+- `400` with `code: "user.unknown_organization"` — `organizationId` doesn't reference an existing
+organization.
+- `403` with `code: "user.action_not_permitted_for_role"` — caller isn't Admin.
+- `409` with `code: "user.duplicate_email"` — another user already has this email.
+
+**Business logic:** the password is hashed with the same `IPasswordHasher<AppUser>` the demo seed
+and login already use — never stored or logged in plain text.
+
+#### `PUT /api/users/{userId}`
+
+**Auth:** any authenticated user; succeeds for the user themselves or an Admin — see below for
+what a non-Admin self-edit can and can't change.
+
+**JSON input:**
+
+| Field | Type | Validation |
+| --- | --- | --- |
+| `email` | `string` | Required, valid email, unique |
+| `displayName` | `string` | Required, 1–200 characters |
+| `address` | `string?` | Optional, max 500 characters |
+| `phone` | `string?` | Optional, max 50 characters |
+| `roles` | `string[]` | Same rule as create — **ignored unless the caller is Admin** |
+| `organizationId` | `guid?` | Same rule as create — **ignored unless the caller is Admin** |
+
+**JSON output —** `200 OK`**:**
+
+```jsonc
+{
+  "user": { /* UserListItem */ },
+  "accessToken": "string|null",
+  "expiresAt": "datetime|null"
+}
+```
+
+**Errors:**
+
+- `400` validation problem, or `user.unknown_organization` — same as create.
+- `403` with `code: "user.action_not_permitted_for_role"` — a non-Admin tried to change their own
+`roles` or `organizationId` to a different value than they already had.
+- `404` — either the user doesn't exist, **or** the caller is a non-Admin editing someone other
+than themselves. Both cases return the identical 404, the same reason
+`GET /api/requests/{id}/quotes/{quoteId}` refuses a competitor's quote with 404 rather than 403 —
+a caller with no visibility right to another user's account shouldn't be able to confirm which
+ids are real ones from the status code alone.
+- `409` with `code: "user.duplicate_email"` — another user already has this email.
+
+**Business logic — session staleness:** `displayName`, `email`, and `roles` are baked into the JWT
+at login (`TokenService.IssueFor`) and never re-read from the database per request. Editing
+**your own** account therefore reissues a fresh token in the response (`accessToken`/`expiresAt`
+are populated only in that case) — the SPA calls the same session-storage function login already
+uses, so your own header never shows a stale name after you save. **Editing someone else's**
+account has no such fix: that person's already-open session keeps showing their old name/email/
+roles until they next log in. This is accepted, documented behavior rather than something this
+endpoint solves — building a token-revocation or refresh system for it was judged disproportionate
+to a demo app.
+
+#### `POST /api/users/{userId}/reset-password`
+
+**Auth:** any authenticated user; succeeds for the user themselves or an Admin.
+
+**JSON input:**
+
+| Field | Type | Validation |
+| --- | --- | --- |
+| `currentPassword` | `string?` | Required (and must be correct) when resetting **your own** password; ignored when an Admin resets someone else's |
+| `newPassword` | `string` | Required, must satisfy every password rule above |
+| `confirmNewPassword` | `string` | Required, must equal `newPassword` |
+
+**JSON output —** `204 No Content`.
+
+**Errors:**
+
+- `400` validation problem — `newPassword` fails a requirement, or doesn't match
+`confirmNewPassword`.
+- `403` with `code: "user.invalid_current_password"` — resetting your own password, and
+`currentPassword` didn't match. **Not `401`**, deliberately: the caller's bearer token is entirely
+valid here, only the submitted current-password value is wrong, and the SPA's single network
+egress (`apiClient.ts`) treats *any* `401` while a session exists as an expired token — it clears
+the session and redirects to `/login`. A `401` here would silently log the user out instead of
+showing them an inline "wrong password" message.
+- `404` — same identical-404 rule as `PUT` above: either the user doesn't exist, or a non-Admin is
+targeting someone other than themselves.
+
+**Business logic:** an Admin resetting someone else's password never needs (or is asked for) that
+person's current password — admin authority substitutes for that proof, the same reason an admin
+password reset exists at all (a user who forgot their password couldn't supply it either way).
+Resetting your own password always requires proving you know the current one. Either way, the
+result is hashed with `IPasswordHasher<AppUser>`; no token reissue is needed here, since a password
+is never itself a JWT claim.
 
 ### Health and diagnostics
 

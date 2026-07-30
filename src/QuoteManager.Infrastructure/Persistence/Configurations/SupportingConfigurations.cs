@@ -18,6 +18,8 @@ public sealed class AppUserConfiguration : IEntityTypeConfiguration<AppUser>
 
         builder.Property(u => u.DisplayName).HasMaxLength(200).IsRequired();
         builder.Property(u => u.PasswordHash).IsRequired();
+        builder.Property(u => u.Address).HasMaxLength(500);
+        builder.Property(u => u.Phone).HasMaxLength(50);
 
         // Stored as the flag names rather than an integer so the seeded rows are legible to anyone
         // inspecting the database during a demo, and so adding a role cannot renumber existing ones.
@@ -46,6 +48,7 @@ public sealed class AuditEntryConfiguration : IEntityTypeConfiguration<AuditEntr
         builder.Property(a => a.Action).HasMaxLength(64).IsRequired();
         builder.Property(a => a.Summary).HasMaxLength(500).IsRequired();
         builder.Property(a => a.ActorDisplayName).HasMaxLength(200).IsRequired();
+        builder.Property(a => a.Note).HasMaxLength(2000);
         builder.Property(a => a.TraceId).HasMaxLength(64);
 
         // The activity timeline reads by subject, newest first; the dashboard reads recent

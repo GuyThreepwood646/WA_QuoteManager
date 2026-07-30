@@ -74,6 +74,30 @@ public sealed class QuoteNotFoundInRequestException(Guid requestId, Guid quoteId
 }
 
 /// <summary>
+/// Thrown directly from <c>UserEndpoints</c> rather than a domain aggregate method - <c>AppUser</c>
+/// deliberately has no aggregate of its own (see its own doc comment), so there is nowhere else for
+/// this guard to live, but the refusal still needs the same stable wire code and status mapping
+/// every other permission refusal gets via <c>DomainExceptionHandler</c>.
+/// </summary>
+public sealed class UserActionNotPermittedException(string action)
+    : DomainException($"The current user's roles do not permit '{action}' on this user.")
+{
+    public override string Code => "user.action_not_permitted_for_role";
+}
+
+/// <summary>
+/// A self-service password change supplied a current password that doesn't match - distinct from
+/// <c>auth.invalid_credentials</c> at login (which never confirms whether the email even exists);
+/// here the caller is already authenticated as this exact user, so confirming their current
+/// password was wrong leaks nothing new.
+/// </summary>
+public sealed class InvalidCurrentPasswordException()
+    : DomainException("The current password is incorrect.")
+{
+    public override string Code => "user.invalid_current_password";
+}
+
+/// <summary>
 /// Wrapper that lets exception messages name a status without <c>Domain.Common</c> depending
 /// on the quote namespace, keeping the exception types usable from any aggregate.
 /// </summary>

@@ -24,6 +24,9 @@ public sealed class AuditEntry
 
     public DateTimeOffset OccurredAt { get; init; }
 
+    /// <summary>Free-text note the actor typed for this event, if any (e.g. why a quote was rejected).</summary>
+    public string? Note { get; init; }
+
     /// <summary>
     /// Correlates the audit row with the diagnostic trace for the same request — audit and logging
     /// stay separate sources of truth (AD-5); this is just the join key between them.

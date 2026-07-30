@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using QuoteManager.Api.Auth;
+using QuoteManager.Api.Common;
 using QuoteManager.Api.IntegrationTests.Auth;
 using QuoteManager.Api.Quotes;
 using QuoteManager.Api.Requests;
@@ -165,6 +166,62 @@ public sealed class QuoteTransitionTests : IDisposable
     }
 
     [Fact]
+    public async Task A_note_supplied_with_a_transition_appears_on_the_request_activity_timeline()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (requestId, quoteId) = await FindQuoteAsync("Regional sample storage — Southeast territory", "vendor2@warehouseanywhere.test");
+        var client = await LoginAsAsync("reviewer@warehouseanywhere.test");
+
+        var before = await GetQuoteAsync(client, requestId, quoteId);
+        var response = await SendActionAsync(
+            client, requestId, quoteId, "StartReview", before.Version, "Looks reasonable, checking references first.");
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var activity = await client.GetFromJsonAsync<PagedResult<ActivityEntryResponse>>(
+            $"/api/requests/{requestId}/activity?pageSize=100", ct);
+        activity.ShouldNotBeNull();
+
+        var entry = activity.Items.Single(e => e.SubjectId == quoteId && e.Action == "QuoteUnderReview");
+        entry.Note.ShouldBe("Looks reasonable, checking references first.");
+        // The note is its own field on the timeline entry, not folded into the summary sentence.
+        entry.Summary.ShouldNotContain("Looks reasonable");
+    }
+
+    [Fact]
+    public async Task A_transition_without_a_note_leaves_the_activity_entrys_note_null()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (requestId, quoteId) = await FindQuoteAsync("Regional sample storage — Southeast territory", "vendor2@warehouseanywhere.test");
+        var client = await LoginAsAsync("reviewer@warehouseanywhere.test");
+
+        var before = await GetQuoteAsync(client, requestId, quoteId);
+        var response = await SendActionAsync(client, requestId, quoteId, "StartReview", before.Version);
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var activity = await client.GetFromJsonAsync<PagedResult<ActivityEntryResponse>>(
+            $"/api/requests/{requestId}/activity?pageSize=100", ct);
+        activity.ShouldNotBeNull();
+
+        var entry = activity.Items.Single(e => e.SubjectId == quoteId && e.Action == "QuoteUnderReview");
+        entry.Note.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task An_overlong_note_is_rejected_as_a_validation_problem()
+    {
+        var (requestId, quoteId) = await FindQuoteAsync("Regional sample storage — Southeast territory", "vendor2@warehouseanywhere.test");
+        var client = await LoginAsAsync("reviewer@warehouseanywhere.test");
+
+        var before = await GetQuoteAsync(client, requestId, quoteId);
+        var response = await SendActionAsync(client, requestId, quoteId, "StartReview", before.Version, new string('x', 2001));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+        var problem = await response.Content.ReadFromJsonAsync<ValidationProblemBody>(TestContext.Current.CancellationToken);
+        problem.ShouldNotBeNull();
+        problem.Errors.ShouldContainKey("Note");
+    }
+
+    [Fact]
     public async Task Applying_an_action_outside_the_defined_enum_is_rejected_as_a_validation_problem_before_any_domain_logic_runs()
     {
         var (requestId, quoteId) = await FindQuoteAsync("Regional sample storage — Southeast territory", "vendor2@warehouseanywhere.test");
@@ -229,13 +286,13 @@ public sealed class QuoteTransitionTests : IDisposable
     }
 
     private static async Task<HttpResponseMessage> SendActionAsync(
-        HttpClient client, Guid requestId, Guid quoteId, string action, int expectedVersion)
+        HttpClient client, Guid requestId, Guid quoteId, string action, int expectedVersion, string? note = null)
     {
         using var message = new HttpRequestMessage(
             HttpMethod.Post,
             $"/api/requests/{requestId}/quotes/{quoteId}/transitions")
         {
-            Content = JsonContent.Create(new { action }),
+            Content = JsonContent.Create(new { action, note }),
         };
         message.Headers.TryAddWithoutValidation("If-Match", $"\"{expectedVersion}\"");
 

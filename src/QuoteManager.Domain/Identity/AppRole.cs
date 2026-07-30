@@ -38,5 +38,39 @@ public static class AppRoleExtensions
     /// </summary>
     public static IEnumerable<AppRole> Split(this AppRole roles) => AllValues.Where(value => roles.HasAny(value));
 
+    /// <summary>The wire name of each individual role held, e.g. <c>["Requester", "Admin"]</c>.</summary>
+    public static IReadOnlyList<string> Names(this AppRole roles) => roles.Split().Select(r => r.ToString()).ToList();
+
+    /// <summary>
+    /// Parses a JSON string array of role names back into a flags value, accepting only the
+    /// individual role literals - never <c>None</c>/<c>All</c>/a combined name/a numeric string -
+    /// so a malformed or crafted request body can't smuggle in a role that isn't one of the four.
+    /// </summary>
+    public static bool TryParseRoles(IEnumerable<string> names, out AppRole roles)
+    {
+        roles = AppRole.None;
+
+        foreach (var name in names)
+        {
+            if (!CanonicalNames.TryGetValue(name, out var role))
+            {
+                roles = AppRole.None;
+                return false;
+            }
+
+            roles |= role;
+        }
+
+        return roles != AppRole.None;
+    }
+
     private static readonly AppRole[] AllValues = [AppRole.Admin, AppRole.Requester, AppRole.Reviewer, AppRole.Vendor];
+
+    private static readonly Dictionary<string, AppRole> CanonicalNames = new(StringComparer.Ordinal)
+    {
+        [nameof(AppRole.Requester)] = AppRole.Requester,
+        [nameof(AppRole.Reviewer)] = AppRole.Reviewer,
+        [nameof(AppRole.Vendor)] = AppRole.Vendor,
+        [nameof(AppRole.Admin)] = AppRole.Admin,
+    };
 }

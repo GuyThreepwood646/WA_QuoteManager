@@ -49,10 +49,11 @@ export function applyQuoteAction(
   requestId: string,
   quote: Pick<RequestQuoteItem, 'id' | 'version'>,
   action: string,
+  note?: string,
 ): Promise<RequestQuoteItem> {
   return apiClient.post<RequestQuoteItem>(
     `/api/requests/${requestId}/quotes/${quote.id}/transitions`,
-    { action },
+    { action, note },
     { 'If-Match': `"${quote.version}"` },
   )
 }

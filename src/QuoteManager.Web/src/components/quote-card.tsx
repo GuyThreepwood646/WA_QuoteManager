@@ -5,7 +5,7 @@ import type { FormEvent } from 'react'
 import { applyQuoteAction, editQuote } from '@/api/requests'
 import type { RequestQuoteItem } from '@/api/types'
 import { ApiError } from '@/api/apiClient'
-import { FormField, FormFieldRow } from '@/components/form-field'
+import { FormField, FormFieldRow, textareaClassName } from '@/components/form-field'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatDate, formatMoney } from '@/lib/format'
@@ -62,12 +62,16 @@ export function QuoteCard({
   const [currency, setCurrency] = useState(quote.currency)
   const [expiresAt, setExpiresAt] = useState(quote.expiresAt?.slice(0, 10) ?? '')
   const [notes, setNotes] = useState(quote.notes ?? '')
+  const [pendingAction, setPendingAction] = useState<string | null>(null)
+  const [actionNote, setActionNote] = useState('')
 
   useEffect(() => {
     setAmount(String(quote.amount))
     setCurrency(quote.currency)
     setExpiresAt(quote.expiresAt?.slice(0, 10) ?? '')
     setNotes(quote.notes ?? '')
+    setPendingAction(null)
+    setActionNote('')
     if (readOnly) {
       setIsEditing(false)
       setError(null)
@@ -76,11 +80,13 @@ export function QuoteCard({
   }, [readOnly, quote.id, quote.status, quote.version, quote.amount, quote.currency, quote.expiresAt, quote.notes])
 
   const actionMutation = useMutation({
-    mutationFn: (action: string) => applyQuoteAction(requestId, quote, action),
+    mutationFn: ({ action, note }: { action: string; note?: string }) => applyQuoteAction(requestId, quote, action, note),
     onSuccess: async () => {
       setError(null)
       setFieldErrors({})
       setIsEditing(false)
+      setPendingAction(null)
+      setActionNote('')
       await refreshRequest(queryClient, requestId)
     },
     onError: (err) => setError(err instanceof ApiError ? err.message : 'Something went wrong.'),
@@ -244,6 +250,45 @@ export function QuoteCard({
             </Button>
           </div>
         </form>
+      ) : pendingAction ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            actionMutation.mutate({
+              action: pendingAction,
+              note: actionNote.trim() === '' ? undefined : actionNote.trim(),
+            })
+          }}
+          className="flex flex-col gap-2 pt-1"
+        >
+          <FormField id={`action-note-${quote.id}`} label={`Note for "${actionStyles[pendingAction].label}" (optional)`}>
+            <textarea
+              className={textareaClassName}
+              value={actionNote}
+              onChange={(event) => setActionNote(event.currentTarget.value)}
+              maxLength={2000}
+              rows={2}
+              autoFocus
+            />
+          </FormField>
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" variant={actionStyles[pendingAction].variant} disabled={actionMutation.isPending}>
+              {actionMutation.isPending ? 'Saving…' : `Confirm ${actionStyles[pendingAction].label.toLowerCase()}`}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={actionMutation.isPending}
+              onClick={() => {
+                setPendingAction(null)
+                setActionNote('')
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
       ) : (
         isInteractive && (
           <div className="flex flex-wrap gap-2 pt-1">
@@ -253,7 +298,7 @@ export function QuoteCard({
                 size="sm"
                 variant={actionStyles[action].variant}
                 disabled={actionMutation.isPending}
-                onClick={() => actionMutation.mutate(action)}
+                onClick={() => setPendingAction(action)}
               >
                 {actionStyles[action].label}
               </Button>

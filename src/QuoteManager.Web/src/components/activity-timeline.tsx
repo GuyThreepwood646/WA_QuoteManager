@@ -40,6 +40,7 @@ export function ActivityTimeline({ requestId }: { requestId: string }) {
               <span className="font-medium">{entry.actorDisplayName}</span>{' '}
               <span className="text-muted-foreground">{entry.summary}</span>
             </p>
+            {entry.note && <p className="text-sm italic text-muted-foreground">"{entry.note}"</p>}
             <p className="text-xs text-muted-foreground" title={formatDate(entry.occurredAt)}>
               {formatRelative(entry.occurredAt)}
             </p>

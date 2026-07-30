@@ -157,7 +157,7 @@ public static class QuoteEndpoints
             return Results.NotFound();
         }
 
-        request.ApplyQuoteAction(quoteId, body.Action, currentUser.ToActor(), timeProvider.GetUtcNow(), expectedVersion);
+        request.ApplyQuoteAction(quoteId, body.Action, currentUser.ToActor(), timeProvider.GetUtcNow(), expectedVersion, body.Note);
 
         await db.SaveChangesAsync(cancellationToken);
 

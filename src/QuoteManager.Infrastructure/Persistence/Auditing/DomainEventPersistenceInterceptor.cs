@@ -64,6 +64,7 @@ public sealed class DomainEventPersistenceInterceptor(TimeProvider timeProvider)
                 ActorId = domainEvent.ActorId,
                 ActorDisplayName = actorNames.GetValueOrDefault(domainEvent.ActorId, "Unknown"),
                 OccurredAt = domainEvent.OccurredAt,
+                Note = domainEvent.Note,
                 TraceId = traceId,
             });
 

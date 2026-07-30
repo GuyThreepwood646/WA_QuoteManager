@@ -15,7 +15,8 @@ public sealed record ActivityEntryResponse(
     string Action,
     string Summary,
     string ActorDisplayName,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    string? Note);
 
 /// <summary>
 /// The per-request activity timeline (AD-5): reads <c>AuditEntry</c> directly.
@@ -68,7 +69,8 @@ public static class RequestActivityEndpoints
                 e.Action,
                 e.Summary,
                 e.ActorDisplayName,
-                e.OccurredAt))
+                e.OccurredAt,
+                e.Note))
             .ToListAsync(cancellationToken);
 
         return Results.Ok(new PagedResult<ActivityEntryResponse>(rows, query.ResolvedPage, query.ResolvedPageSize, total));

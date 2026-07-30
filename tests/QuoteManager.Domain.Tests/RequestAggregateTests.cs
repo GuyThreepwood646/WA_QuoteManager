@@ -212,6 +212,37 @@ public sealed class RequestAggregateTests
     }
 
     [Fact]
+    public void An_optional_note_on_a_transition_reaches_the_raised_event_but_not_the_quote_itself()
+    {
+        var request = NewRequest();
+        var quote = Submit(request, 1000m, Vendor);
+
+        request.ApplyQuoteAction(quote.Id, QuoteAction.StartReview, Reviewer, Now, note: "Looks reasonable, checking references first.");
+
+        var raised = request.DomainEvents.OfType<QuoteStatusChanged>().Last();
+        raised.Note.ShouldBe("Looks reasonable, checking references first.");
+        // The note is surfaced as its own field, not folded into the machine-generated summary sentence.
+        raised.Summary.ShouldNotContain("Looks reasonable");
+
+        // The note is a fact about this specific transition, not a property of the quote's
+        // current state - unlike StatusReason (which the system alone sets), it's never stored
+        // on the quote itself, only in the event/audit trail.
+        quote.StatusReason.ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_transition_without_a_note_raises_an_event_with_no_note()
+    {
+        var request = NewRequest();
+        var quote = Submit(request, 1000m, Vendor);
+
+        request.ApplyQuoteAction(quote.Id, QuoteAction.StartReview, Reviewer, Now);
+
+        var raised = request.DomainEvents.OfType<QuoteStatusChanged>().Last();
+        raised.Note.ShouldBeNull();
+    }
+
+    [Fact]
     public void An_unknown_quote_id_is_a_domain_refusal_rather_than_a_null_reference()
     {
         var request = NewRequest();

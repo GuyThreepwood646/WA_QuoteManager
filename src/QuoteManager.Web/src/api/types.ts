@@ -151,6 +151,7 @@ export interface ActivityEntryItem {
   summary: string
   actorDisplayName: string
   occurredAt: string
+  note: string | null
 }
 
 export interface CreateQuoteInput {
@@ -166,4 +167,53 @@ export interface EditQuoteInput {
   currency: string
   expiresAt?: string
   notes?: string
+}
+
+export interface UserListItem {
+  id: string
+  email: string
+  displayName: string
+  roles: string[]
+  organizationId: string | null
+  organizationName: string | null
+  address: string | null
+  phone: string | null
+}
+
+export interface CreateUserInput {
+  email: string
+  displayName: string
+  roles: string[]
+  organizationId?: string
+  address?: string
+  phone?: string
+  password: string
+  confirmPassword: string
+}
+
+export interface UpdateUserInput {
+  email: string
+  displayName: string
+  address?: string
+  phone?: string
+  roles: string[]
+  organizationId?: string
+}
+
+/**
+ * `accessToken`/`expiresAt` are only present when the edited user was the caller themselves -
+ * `DisplayName`/`Email`/`Roles` are baked into the JWT at login and never re-read from the
+ * database per request, so a self-edit needs a fresh token or the header would keep showing
+ * stale values until the next login.
+ */
+export interface UpdateUserResult {
+  user: UserListItem
+  accessToken?: string
+  expiresAt?: string
+}
+
+export interface ResetPasswordInput {
+  currentPassword?: string
+  newPassword: string
+  confirmNewPassword: string
 }

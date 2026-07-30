@@ -124,6 +124,7 @@ public sealed record QuoteStatusChanged(
     QuoteStatus From,
     QuoteStatus To,
     string? Reason,
+    string? Note,
     Guid ActorId,
     DateTimeOffset OccurredAt) : IDomainEvent
 {
@@ -133,6 +134,9 @@ public sealed record QuoteStatusChanged(
 
     public string Action => $"Quote{To}";
 
+    // Note is surfaced as its own field (AuditEntry.Note / ActivityEntryResponse.Note) rather than
+    // folded in here, so the activity timeline can render it as its own line instead of duplicating
+    // it inside this sentence.
     public string Summary => Reason is null
         ? $"Quote moved from {From} to {To}."
         : $"Quote moved from {From} to {To} ({Reason}).";

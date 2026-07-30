@@ -12,6 +12,10 @@ public sealed record ApplyQuoteActionRequest : IValidatableObject
 {
     public required QuoteAction Action { get; init; }
 
+    /// <summary>Optional free-text explanation for this specific transition, shown in the request's activity timeline.</summary>
+    [StringLength(2000)]
+    public string? Note { get; init; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (!Enum.IsDefined(Action))

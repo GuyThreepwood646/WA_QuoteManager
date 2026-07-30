@@ -29,6 +29,13 @@ public sealed class DomainExceptionHandler(IProblemDetailsService problemDetails
             RequestCreationNotPermittedException e => (StatusCodes.Status403Forbidden, e.Code, e.Message),
             RequestActionNotPermittedException e => (StatusCodes.Status403Forbidden, e.Code, e.Message),
             OrganizationActionNotPermittedException e => (StatusCodes.Status403Forbidden, e.Code, e.Message),
+            UserActionNotPermittedException e => (StatusCodes.Status403Forbidden, e.Code, e.Message),
+            // 403, not 401: the caller's own session is perfectly valid here (they're already
+            // authenticated as this exact user) - only the submitted current-password value was
+            // wrong. apiClient.ts treats ANY 401 while a session exists as "your token expired,"
+            // force-clearing the session and redirecting to /login - a 401 here would silently log
+            // the user out instead of showing them an inline "wrong password" error.
+            InvalidCurrentPasswordException e => (StatusCodes.Status403Forbidden, e.Code, e.Message),
             DomainException e => (StatusCodes.Status409Conflict, e.Code, e.Message),
             DbUpdateConcurrencyException => (
                 StatusCodes.Status409Conflict,

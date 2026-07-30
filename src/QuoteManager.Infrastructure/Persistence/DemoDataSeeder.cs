@@ -99,12 +99,24 @@ public sealed class DemoDataSeeder(
 
         context.Organizations.AddRange(meridian, palmetto, secureBase, crateworks, interstate);
 
-        var admin = CreateUser("admin@warehouseanywhere.test", "Ada Admin", AppRole.Admin, null);
-        var requester = CreateUser("requester@warehouseanywhere.test", "Riley Requester", AppRole.Requester, meridian.Id);
-        var reviewer = CreateUser("reviewer@warehouseanywhere.test", "Rae Reviewer", AppRole.Reviewer, palmetto.Id);
-        var secureBaseUser = CreateUser("vendor@warehouseanywhere.test", "Vic Vendor", AppRole.Vendor, secureBase.Id);
-        var crateworksUser = CreateUser("vendor2@warehouseanywhere.test", "Kim Crateworks", AppRole.Vendor, crateworks.Id);
-        var interstateUser = CreateUser("vendor3@warehouseanywhere.test", "Rob Interstate", AppRole.Vendor, interstate.Id);
+        var admin = CreateUser(
+            "admin@warehouseanywhere.test", "Ada Admin", AppRole.Admin, null,
+            "100 Commerce Center Drive, Suite 200, Charlotte, NC 28202", "+1 (704) 555-0111");
+        var requester = CreateUser(
+            "requester@warehouseanywhere.test", "Riley Requester", AppRole.Requester, meridian.Id,
+            "1200 Peachtree Industrial Blvd, Suite 400, Atlanta, GA 30341", "+1 (404) 555-0133");
+        var reviewer = CreateUser(
+            "reviewer@warehouseanywhere.test", "Rae Reviewer", AppRole.Reviewer, palmetto.Id,
+            "88 King Street, Charleston, SC 29401", "+1 (843) 555-0119");
+        var secureBaseUser = CreateUser(
+            "vendor@warehouseanywhere.test", "Vic Vendor", AppRole.Vendor, secureBase.Id,
+            "7420 Industrial Park Road, Charlotte, NC 28213", "+1 (704) 555-0144");
+        var crateworksUser = CreateUser(
+            "vendor2@warehouseanywhere.test", "Kim Crateworks", AppRole.Vendor, crateworks.Id,
+            "55 Crate Lane, Greensboro, NC 27409", "+1 (336) 555-0128");
+        var interstateUser = CreateUser(
+            "vendor3@warehouseanywhere.test", "Rob Interstate", AppRole.Vendor, interstate.Id,
+            "400 Freight Terminal Drive, Spartanburg, SC 29303", "+1 (864) 555-0177");
 
         context.Users.AddRange(admin, requester, reviewer, secureBaseUser, crateworksUser, interstateUser);
 
@@ -130,7 +142,9 @@ public sealed class DemoDataSeeder(
             "Climate-controlled 4-unit block with 24/7 keycard access and rep check-in log.",
             secureBaseActor, now.AddDays(-8));
         sampleStorage.ApplyQuoteAction(sampleStorageSecureBase.Id, QuoteAction.Submit, secureBaseActor, now.AddDays(-8));
-        sampleStorage.ApplyQuoteAction(sampleStorageSecureBase.Id, QuoteAction.StartReview, reviewerActor, now.AddDays(-3));
+        sampleStorage.ApplyQuoteAction(
+            sampleStorageSecureBase.Id, QuoteAction.StartReview, reviewerActor, now.AddDays(-3),
+            note: "Confirming climate-control specs with the facilities team before sign-off.");
 
         var sampleStorageCrateworks = sampleStorage.AddQuote(
             crateworks.Id, Money(1_875m), now.AddDays(20),
@@ -161,7 +175,9 @@ public sealed class DemoDataSeeder(
         tradeShow.ApplyQuoteAction(tradeShowCrateworks.Id, QuoteAction.Submit, crateworksActor, now.AddDays(-11));
 
         tradeShow.ApplyQuoteAction(tradeShowInterstate.Id, QuoteAction.StartReview, reviewerActor, now.AddDays(-9));
-        tradeShow.ApplyQuoteAction(tradeShowInterstate.Id, QuoteAction.Accept, reviewerActor, now.AddDays(-8));
+        tradeShow.ApplyQuoteAction(
+            tradeShowInterstate.Id, QuoteAction.Accept, reviewerActor, now.AddDays(-8),
+            note: "Best combination of price and included drayage coverage across the three venues.");
 
         // Lapses in two days: the dashboard's "act now" case.
         var overflowStorage = Request.Create(
@@ -216,7 +232,9 @@ public sealed class DemoDataSeeder(
         var seasonalLeaseCrateworks = seasonalLease.AddQuote(
             crateworks.Id, Money(4_950m), now.AddDays(10), null, crateworksActor, now.AddDays(-27));
         seasonalLease.ApplyQuoteAction(seasonalLeaseCrateworks.Id, QuoteAction.Submit, crateworksActor, now.AddDays(-27));
-        seasonalLease.ApplyQuoteAction(seasonalLeaseCrateworks.Id, QuoteAction.Withdraw, crateworksActor, now.AddDays(-20));
+        seasonalLease.ApplyQuoteAction(
+            seasonalLeaseCrateworks.Id, QuoteAction.Withdraw, crateworksActor, now.AddDays(-20),
+            note: "Can no longer honor this rate for the requested window — crew capacity fell through.");
 
         Request[] requests = [sampleStorage, tradeShow, overflowStorage, popUpStorage, coldChainPilot, seasonalLease];
         context.Requests.AddRange(requests);
@@ -253,7 +271,9 @@ public sealed class DemoDataSeeder(
             organization.CreatedAt);
     }
 
-    private AppUser CreateUser(string email, string displayName, AppRole roles, Guid? organizationId)
+    private AppUser CreateUser(
+        string email, string displayName, AppRole roles, Guid? organizationId,
+        string? address = null, string? phone = null)
     {
         var user = new AppUser
         {
@@ -262,6 +282,8 @@ public sealed class DemoDataSeeder(
             DisplayName = displayName,
             Roles = roles,
             OrganizationId = organizationId,
+            Address = address,
+            Phone = phone,
             PasswordHash = string.Empty,
         };
 

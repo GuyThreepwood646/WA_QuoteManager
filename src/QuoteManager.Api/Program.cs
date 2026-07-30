@@ -11,6 +11,7 @@ using QuoteManager.Api.Observability;
 using QuoteManager.Api.Organizations;
 using QuoteManager.Api.Quotes;
 using QuoteManager.Api.Requests;
+using QuoteManager.Api.Users;
 using QuoteManager.Infrastructure;
 using QuoteManager.Infrastructure.Persistence;
 using Scalar.AspNetCore;
@@ -122,6 +123,7 @@ try
     app.MapRequestEndpoints();
     app.MapRequestActivityEndpoints();
     app.MapOrganizationEndpoints();
+    app.MapUserEndpoints();
 
     // MapFallbackToFile has the lowest route priority, so every API and OpenAPI route above wins
     // and only genuine client-side routes (e.g. /dashboard, with no matching physical file) fall

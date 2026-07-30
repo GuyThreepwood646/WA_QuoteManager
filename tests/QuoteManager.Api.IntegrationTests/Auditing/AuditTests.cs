@@ -85,7 +85,7 @@ public sealed class AuditTests : IDisposable
 
         using var message = new HttpRequestMessage(HttpMethod.Post, $"/api/requests/{requestId}/quotes/{quoteId}/transitions")
         {
-            Content = JsonContent.Create(new { action = "StartReview" }),
+            Content = JsonContent.Create(new { action = "StartReview", note = "Checking references before proceeding." }),
         };
         message.Headers.TryAddWithoutValidation("If-Match", $"\"{before!.Version}\"");
         var actionResponse = await client.SendAsync(message, ct);
@@ -99,6 +99,7 @@ public sealed class AuditTests : IDisposable
 
         auditRow.ActorDisplayName.ShouldBe("Rae Reviewer");
         auditRow.SubjectType.ShouldBe("Quote");
+        auditRow.Note.ShouldBe("Checking references before proceeding.");
     }
 
     private async Task<(Guid RequestId, Guid QuoteId)> FindQuoteAsync(string requestTitle, string vendorEmail)

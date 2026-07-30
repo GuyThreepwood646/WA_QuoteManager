@@ -11,18 +11,22 @@ public sealed class AppUser
 {
     public Guid Id { get; init; }
 
-    public required string Email { get; init; }
+    public required string Email { get; set; }
 
-    public required string DisplayName { get; init; }
+    public required string DisplayName { get; set; }
 
     public required string PasswordHash { get; set; }
 
-    public AppRole Roles { get; init; }
+    public AppRole Roles { get; set; }
 
     /// <summary>
     /// The organization this user acts for, or null for staff who act for the platform.
     /// </summary>
-    public Guid? OrganizationId { get; init; }
+    public Guid? OrganizationId { get; set; }
+
+    public string? Address { get; set; }
+
+    public string? Phone { get; set; }
 
     public DomainActor ToActor() => new(Id, DisplayName, Roles, OrganizationId);
 }

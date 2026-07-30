@@ -1,4 +1,4 @@
-import { Building2, FileText, LayoutDashboard, LogOut } from 'lucide-react'
+import { Building2, FileText, LayoutDashboard, LogOut, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { NavLink as RouterNavLink, Navigate, Route, Routes, useLocation } from 'react-router'
 
@@ -11,9 +11,11 @@ import { DashboardPage } from './routes/DashboardPage'
 import { LoginPage } from './routes/LoginPage'
 import { NewOrganizationPage } from './routes/NewOrganizationPage'
 import { NewRequestPage } from './routes/NewRequestPage'
+import { NewUserPage } from './routes/NewUserPage'
 import { OrganizationsPage } from './routes/OrganizationsPage'
 import { RequestDetailPage } from './routes/RequestDetailPage'
 import { RequestsListPage } from './routes/RequestsListPage'
+import { UsersPage } from './routes/UsersPage'
 
 export function App() {
   return (
@@ -46,6 +48,7 @@ const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/requests', label: 'Requests', icon: FileText },
   { to: '/organizations', label: 'Organizations', icon: Building2 },
+  { to: '/users', label: 'Users', icon: Users },
 ]
 
 /**
@@ -105,6 +108,8 @@ function Shell() {
             <Route path="/requests/:requestId" element={<RequestDetailPage />} />
             <Route path="/organizations" element={<OrganizationsPage />} />
             <Route path="/organizations/new" element={<NewOrganizationPage />} />
+            <Route path="/users" element={<UsersPage />} />
+            <Route path="/users/new" element={<NewUserPage />} />
           </Routes>
         </main>
       </div>
