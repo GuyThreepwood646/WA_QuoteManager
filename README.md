@@ -117,7 +117,33 @@ Defaults live in `src/QuoteManager.Api/appsettings.json` and need no changes to 
 | `Jwt:Issuer` / `Jwt:Audience`    | `QuoteManager` / `QuoteManager.Client` | Token validation parameters.                                                                                                                                                     |
 | `AzureMonitor:ConnectionString`  | unset                                  | If present, OpenTelemetry exports to Azure Monitor. Absent by default — telemetry still works locally via the console/OTel pipeline.                                             |
 | `ServiceBus:ConnectionString`    | unset                                  | If present, integration events publish to Azure Service Bus. Absent by default — an in-process channel adapter is used instead, so outbox/messaging works with zero cloud setup. |
+| `KeyVault:Uri`                   | unset                                  | If present, secrets are additionally loaded from Azure Key Vault (see below). Absent by default — everything above reads from `appsettings.json` / user secrets / env vars as usual. |
 
+#### Secrets: Azure Key Vault (optional)
+
+`Jwt:SigningKey` is the one setting above that's a real secret rather than a connection detail, and
+the committed value is explicitly a demo placeholder. `Program.cs` wires up the same "adapter only
+activates when configured" pattern already used for Azure Monitor and Service Bus above: if
+`KeyVault:Uri` is set, `builder.Configuration.AddAzureKeyVault(...)` layers the vault's secrets on
+top of the existing configuration, and a same-named secret there overrides the local value; if it's
+unset (the default), the call is skipped entirely and configuration works exactly as it does today.
+
+```json
+{
+  "KeyVault": { "Uri": "https://your-vault-name.vault.azure.net/" }
+}
+```
+
+- Authentication uses `DefaultAzureCredential` — a managed identity when running in Azure, or the
+  logged-in `az`/Visual Studio/VS Code credential for local development against a real vault. No
+  vault secret or connection string is ever hardcoded to reach it.
+- Key Vault secret names can't contain `:`, so nested keys use `--` instead — the signing key above
+  would be stored as a secret literally named `Jwt--SigningKey`.
+- **This repository has no Azure subscription to point at**, so only the *absent* path — the actual
+  default, exercised by every test in the suite — is verified end to end. The *present* path is
+  scaffolding: it follows the standard, documented `Azure.Extensions.AspNetCore.Configuration.Secrets`
+  integration and is straightforward to verify against a real vault, but that verification hasn't
+  been (and can't be) done here.
 
 
 
@@ -966,4 +992,34 @@ is never itself a JWT claim.
 - `GET /openapi/v1.json` — anonymous, the generated OpenAPI document.
 - `GET /scalar/v1` — anonymous, **development environment only** — an interactive API reference UI
 (Scalar) for exploring every endpoint above by hand.
+
+### Content Security Policy
+
+Every response carries a baseline `Content-Security-Policy` header, set by a small piece of
+middleware near the top of `Program.cs`. This API is the actual security boundary for the header,
+not just the JSON endpoints: the same process also serves the built SPA (`UseStaticFiles` /
+`MapFallbackToFile("/index.html")`), so the header lands on the HTML shell, its JS/CSS bundles, and
+every `/api` response alike.
+
+```
+default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
+img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none';
+base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+```
+
+- Everything defaults to same-origin (`'self'`); there are no third-party scripts, fonts, or
+  images anywhere in the app, so nothing else needed opening up.
+- `style-src` allows `'unsafe-inline'` because Radix UI (underlying shadcn/ui's `Select`/`Popover`)
+  positions its portaled dropdowns with inline `style="..."` attributes — without it, the
+  Organization picker on the Users and Organizations forms would render in the wrong place or not
+  open at all.
+- `frame-ancestors 'none'` blocks the app from being framed by another site (the CSP-native
+  replacement for `X-Frame-Options: DENY`).
+- **`/scalar` and `/openapi` are excluded** — Scalar's dev-only API reference page loads its own UI
+  bundle from a CDN, which this policy would otherwise block. Excluding two developer-tool routes
+  was judged simpler and less risky than widening `script-src` for the whole app just to
+  accommodate a page that isn't part of the product surface (and isn't reachable outside
+  Development in the first place).
+- Enforced by `SecurityHeadersTests` (`tests/QuoteManager.Api.IntegrationTests/Security/`): the
+  header is asserted present on `/`, `/health`, and an API route, and asserted absent on `/scalar`.
 

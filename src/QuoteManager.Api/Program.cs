@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Serialization;
+using Azure.Identity;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -17,6 +18,18 @@ using QuoteManager.Infrastructure.Persistence;
 using Scalar.AspNetCore;
 using Serilog;
 
+const string ContentSecurityPolicy =
+    "default-src 'self'; " +
+    "script-src 'self'; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "img-src 'self' data:; " +
+    "font-src 'self'; " +
+    "connect-src 'self'; " +
+    "object-src 'none'; " +
+    "base-uri 'self'; " +
+    "form-action 'self'; " +
+    "frame-ancestors 'none'";
+
 // This bootstrap logger exists only so a start-up crash - a bad connection string, a failed
 // migration - is still recorded before the fully configured logger takes over.
 Log.Logger = TelemetryConfiguration.CreateBootstrapLogger();
@@ -24,6 +37,19 @@ Log.Logger = TelemetryConfiguration.CreateBootstrapLogger();
 try
 {
     var builder = WebApplication.CreateBuilder(args);
+
+    // If a Key Vault URI is configured, its secrets are layered on top of appsettings.json/user
+    // secrets/env vars and take precedence for any matching key (e.g. a Jwt--SigningKey secret
+    // maps to Jwt:SigningKey) - gated on its being present, the same "adapter only activates when
+    // configured" pattern as the Azure Monitor connection string below. This has no real vault to
+    // exercise in this environment, so only the "not configured" path - the actual default here -
+    // is verified; DefaultAzureCredential resolves a managed identity in Azure and the logged-in
+    // az/Visual Studio/VS Code credential for local development against a real vault.
+    var keyVaultUri = builder.Configuration["KeyVault:Uri"];
+    if (!string.IsNullOrWhiteSpace(keyVaultUri))
+    {
+        builder.Configuration.AddAzureKeyVault(new Uri(keyVaultUri), new DefaultAzureCredential());
+    }
 
     builder.Host.UseSerilog((context, services, configuration) =>
         TelemetryConfiguration.Configure(configuration, context.Configuration, context.HostingEnvironment));
@@ -97,6 +123,22 @@ try
     // be tied back to a distributed trace and an actor.
     app.UseSerilogRequestLogging(options =>
         options.EnrichDiagnosticContext = TelemetryConfiguration.EnrichRequestLog);
+
+    // A baseline CSP on every response: this API is the actual security boundary, since it also
+    // serves the built SPA (UseStaticFiles/MapFallbackToFile below). Scalar's dev-only API
+    // reference page loads its UI bundle from a CDN, so it's excluded rather than widening the
+    // policy for the rest of the app. style-src needs 'unsafe-inline' because Radix UI (used by
+    // shadcn/ui's Select/Popover) positions its portaled content via inline style attributes.
+    app.Use(async (context, next) =>
+    {
+        if (!context.Request.Path.StartsWithSegments("/scalar") &&
+            !context.Request.Path.StartsWithSegments("/openapi"))
+        {
+            context.Response.Headers.Append("Content-Security-Policy", ContentSecurityPolicy);
+        }
+
+        await next();
+    });
 
     app.UseExceptionHandler();
     app.UseStatusCodePages();
